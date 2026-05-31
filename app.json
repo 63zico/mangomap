@@ -1,0 +1,41 @@
+﻿{
+  "expo": {
+    "name": "MANGOMAP",
+    "slug": "mangomap",
+    "version": "1.0.0",
+    "scheme": "mangomap",
+    "orientation": "portrait",
+    "icon": "./assets/mango-map-logo.jpg",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#FFF7E8"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.mangomap.travel",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "MANGOMAP에서 모임과 중고장터 사진을 등록하기 위해 사진 접근 권한이 필요합니다.",
+        "NSCameraUsageDescription": "MANGOMAP에서 모임과 중고장터 사진을 촬영해 등록하기 위해 카메라 권한이 필요합니다."
+      }
+    },
+    "android": {
+      "package": "app.mangomap.travel",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/mango-map-logo.jpg",
+        "backgroundColor": "#FFF7DF"
+      },
+      "permissions": [
+        "android.permission.INTERNET"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/mango-map-logo.jpg"
+    }
+  }
+}

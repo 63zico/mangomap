@@ -1,0 +1,16 @@
+node_modules/
+.expo/
+.env
+dist/
+build/
+data/collected-google-places.json
+data/raw-google-places/
+expo-web*.log
+screenshots/
+*.err.log
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+.vercel
