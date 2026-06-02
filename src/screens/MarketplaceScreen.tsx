@@ -450,8 +450,7 @@ function PhotoFilePicker({
 
 function getSellerTemperature(item: MarketItem) {
   if (typeof item.sellerTemp === "number") return item.sellerTemp;
-  const seed = Array.from(item.id).reduce((sum, character) => sum + character.charCodeAt(0), 0);
-  return Math.round((36.5 + (seed % 48) / 10) * 10) / 10;
+  return 36.5;
 }
 
 function getSellerBadge(item: MarketItem) {

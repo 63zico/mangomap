@@ -234,7 +234,7 @@ function createInitialMeetupChat(event: LocalMeetup): MeetupChatMessage[] {
 function getMeetupQuickReply(event: LocalMeetup, question: string) {
   if (question === "정확한 위치?") return `${getEventVenueLine(event)} 기준으로 만나요. 출발 전 지도에서 입구 위치를 한 번 더 확인해주세요.`;
   if (question === "비용 확인") return `${getEventPrice(event)} 기준이에요. 현장 결제 조건이 있으면 대화에서 먼저 확인하고 움직이세요.`;
-  if (question === "현재 몇 명?") return `${getAttendeeCopy(event)} 상태예요. 실제 확정 인원은 모임 직전에 한 번 더 확인하면 좋아요.`;
+  if (question === "현재 몇 명?") return `현재 모집 ${getMeetupCapacityLabel(event)} 상태예요. 실제 입장 인원은 모임 카드에서 확인하면 좋아요.`;
   if (question === "초행자 가능?") return "처음 참여해도 공개 장소에서 합류하고, 귀가 Grab만 먼저 정하면 부담이 적어요.";
   return "확인했어요. 호스트가 시간, 장소, 비용을 정리해줄 거예요.";
 }
@@ -3024,7 +3024,7 @@ function MeetupEventCard({
             </View>
           ))}
         </View>
-        <Text style={styles.attendeeText}>{getAttendeeCopy(event)} · {recruitmentCopy}</Text>
+        <Text style={styles.attendeeText}>{getAttendeeCopy(event, memberCount)}</Text>
       </View>
 
       <View style={styles.eventInfoGrid}>
@@ -4392,9 +4392,10 @@ function getAvatarInitials(event: LocalMeetup) {
   return (source.length >= 3 ? source : [...source, "나", "현", "여"]).slice(0, 3);
 }
 
-function getAttendeeCopy(event: LocalMeetup) {
-  const interestCount = 8 + getStableNumber(event.id, 28);
-  return `${interestCount}명 관심 · ${event.seats}`;
+function getAttendeeCopy(event: LocalMeetup, memberCount = 0) {
+  const count = Math.max(0, memberCount);
+  const capacity = getMeetupCapacityLabel(event);
+  return `${count}명 입장 · 모집 ${capacity}`;
 }
 
 function getMeetupCapacityLabel(event: LocalMeetup) {
@@ -4412,20 +4413,8 @@ function getMeetupRecruitmentCopy(event: LocalMeetup, memberCount: number) {
   return `입장 ${memberCount}명 / 모집 ${getMeetupCapacityLabel(event)}`;
 }
 
-function getChatParticipantCount(event: LocalMeetup, attending: boolean) {
-  return 2 + getStableNumber(event.id, 5) + (attending ? 1 : 0);
-}
-
 function formatMeetupCategoryLabel(category: MeetupCategory) {
   return meetupCategories.find((item) => item.category === category)?.label ?? category;
-}
-
-function getStableNumber(value: string, max: number) {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-  }
-  return hash % max;
 }
 
 function getMeetupPlaceholder(category: MeetupCategory) {
