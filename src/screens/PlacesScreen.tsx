@@ -58,7 +58,7 @@ const filters: Array<{ id: FilterId; label: string; match: (place: CuratedPlace)
   { id: "food", label: "맛집", match: (place) => place.category === "맛집" },
   { id: "cafe", label: "카페", match: (place) => place.category === "카페" },
   { id: "massage", label: "마사지", match: (place) => place.category === "마사지" },
-  { id: "rooftop", label: "루프탑", match: (place) => place.category === "바/루프탑" || hasTag(place, ["루프탑", "칵테일", "클럽"]) },
+  { id: "rooftop", label: "루프탑", match: (place) => place.category === "바/루프탑" || hasTag(place, ["루프탑", "루프탑바", "스카이바"]) },
   { id: "karaoke", label: "가라오케", match: (place) => place.category === "가라오케" },
   { id: "shopping", label: "쇼핑", match: (place) => place.category === "쇼핑" },
   { id: "photo", label: "관광명소", match: (place) => place.category === "사진명소" },
@@ -113,6 +113,14 @@ export function PlacesScreen({
   }, [comments]);
 
   const selectedFilter = filters.find((filter) => filter.id === selectedFilterId) ?? filters[0];
+  const filterCounts = useMemo(() => {
+    const cityPlaces = curatedPlaces.filter((place) => place.city === selectedCity);
+    return filters.reduce<Partial<Record<FilterId, number>>>((counts, filter) => {
+      counts[filter.id] = cityPlaces.filter((place) => filter.match(place)).length;
+      return counts;
+    }, {});
+  }, [selectedCity]);
+
   const places = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return curatedPlaces
@@ -133,7 +141,7 @@ export function PlacesScreen({
 
   if (selectedPlace) {
     return (
-      <AppShell maxWidth={isDesktop ? 1160 : 560} horizontalPadding={isDesktop ? 32 : 20}>
+      <AppShell withBottomNav maxWidth={isDesktop ? 1160 : 560} horizontalPadding={isDesktop ? 32 : 20}>
         <PlaceDetail
           place={selectedPlace}
           saved={savedPlaceIds.includes(selectedPlace.id)}
@@ -177,7 +185,7 @@ export function PlacesScreen({
   }
 
   return (
-    <AppShell maxWidth={appMaxWidth} horizontalPadding={isDesktop ? 32 : 20}>
+    <AppShell withBottomNav maxWidth={appMaxWidth} horizontalPadding={isDesktop ? 32 : 20}>
       <Header eyebrow="탐색" title={`${selectedCity}의 ${selectedFilter.label}`} subtitle="망고맵 추천과 여행자 댓글을 한 번에 확인해요." />
 
       <View style={[styles.searchPanel, isDesktop && styles.searchPanelDesktop]}>
@@ -205,12 +213,18 @@ export function PlacesScreen({
             const filter = filters.find((item) => item.id === filterId) ?? filters[0];
             return (
               <Pressable key={filter.id} onPress={() => setSelectedFilterId(filter.id)} style={[styles.filterPill, selectedFilterId === filter.id && styles.filterPillActive]}>
-                <Text style={styles.filterIcon}>{getFilterIcon(filter.id)}</Text>
+                <Text style={[styles.filterIcon, selectedFilterId === filter.id && styles.filterIconActive]}>{getFilterIcon(filter.id)}</Text>
                 <Text style={[styles.filterText, selectedFilterId === filter.id && styles.filterTextActive]}>{filter.label}</Text>
+                <Text style={[styles.filterCount, selectedFilterId === filter.id && styles.filterCountActive]}>{filterCounts[filter.id] ?? 0}곳</Text>
               </Pressable>
             );
           })}
         </ScrollView>
+        <View style={styles.activeFilterSummary}>
+          <Text style={styles.activeFilterSummaryText}>
+            지금 {selectedCity} · {selectedFilter.label} {places.length}곳만 보는 중
+          </Text>
+        </View>
       </View>
 
       <View style={styles.topFilterBar}>
@@ -1032,8 +1046,20 @@ const styles = StyleSheet.create({
   cityPillText: { color: colors.muted, fontSize: 15, fontWeight: "900" },
   cityPillTextActive: { color: "#271400" },
   filterTabs: { gap: 14, paddingRight: 16 },
-  filterPill: { alignItems: "center", gap: 7, minWidth: 70 },
-  filterPillActive: {},
+  filterPill: {
+    alignItems: "center",
+    gap: 6,
+    minWidth: 76,
+    paddingHorizontal: 6,
+    paddingVertical: 7,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "transparent"
+  },
+  filterPillActive: {
+    backgroundColor: "#FFF2CE",
+    borderColor: colors.cyan
+  },
   filterIcon: {
     width: 58,
     height: 58,
@@ -1046,8 +1072,37 @@ const styles = StyleSheet.create({
     borderColor: "#FFD67D",
     fontSize: 25
   },
+  filterIconActive: {
+    backgroundColor: colors.cyan,
+    borderColor: "#063F28"
+  },
   filterText: { color: colors.muted, fontSize: 13, fontWeight: "900" },
-  filterTextActive: { color: "#1F2937" },
+  filterTextActive: { color: "#063F28" },
+  filterCount: {
+    color: "#A87813",
+    fontSize: 11,
+    fontWeight: "900",
+    lineHeight: 14
+  },
+  filterCountActive: {
+    color: "#271400"
+  },
+  activeFilterSummary: {
+    minHeight: 38,
+    borderRadius: 19,
+    backgroundColor: "#FFF8E6",
+    borderWidth: 1,
+    borderColor: "#F0D89A",
+    paddingHorizontal: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "flex-start"
+  },
+  activeFilterSummaryText: {
+    color: "#063F28",
+    fontSize: 13,
+    fontWeight: "900"
+  },
   topFilterBar: {
     flexDirection: "row",
     gap: 10,
@@ -1289,17 +1344,17 @@ const styles = StyleSheet.create({
   allButtonText: { color: "#063F28", fontSize: 20, fontWeight: "900" },
   floatingMapButton: {
     position: "absolute",
-    bottom: 88,
+    bottom: 118,
     alignSelf: "center",
-    minWidth: 150,
-    minHeight: 64,
-    borderRadius: 34,
+    minWidth: 132,
+    minHeight: 58,
+    borderRadius: 29,
     backgroundColor: "#063F28",
     alignItems: "center",
     justifyContent: "center",
     ...shadow
   },
-  floatingMapText: { color: "#FFFFFF", fontSize: 22, fontWeight: "900" },
+  floatingMapText: { color: "#FFFFFF", fontSize: 20, fontWeight: "900" },
   detailPage: { flex: 1, backgroundColor: "#FFFFFF" },
   detailContent: { paddingBottom: 120 },
   detailContentDesktop: {

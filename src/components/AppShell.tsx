@@ -90,6 +90,6 @@ const styles = StyleSheet.create({
     paddingVertical: 18
   },
   navPadding: {
-    paddingBottom: 92
+    paddingBottom: 156
   }
 });
