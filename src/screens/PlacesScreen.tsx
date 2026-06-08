@@ -329,6 +329,11 @@ function DesktopExploreMapPanel({
 
   const focusedPlace = places.find((place) => place.id === focusedPlaceId) ?? places[0];
   const mapUrl = focusedPlace ? getStaticMapUrl(focusedPlace, places) : undefined;
+  const [mapFailed, setMapFailed] = useState(false);
+
+  useEffect(() => {
+    setMapFailed(false);
+  }, [mapUrl]);
 
   return (
     <View style={styles.exploreMapPanel}>
@@ -337,12 +342,29 @@ function DesktopExploreMapPanel({
         <Text style={styles.exploreMapTitle}>{city}에서 바로 비교</Text>
       </View>
       <View style={styles.exploreMapCanvas}>
-        {mapUrl ? (
-          <Image source={{ uri: mapUrl }} style={styles.exploreMapImage} />
+        {mapUrl && !mapFailed ? (
+          <Image source={{ uri: mapUrl }} style={styles.exploreMapImage} resizeMode="cover" onError={() => setMapFailed(true)} />
         ) : (
-          <View style={styles.exploreMapEmpty}>
-            <Text style={styles.exploreMapEmptyTitle}>지도 준비중</Text>
-            <Text style={styles.exploreMapEmptyCopy}>좌표가 있는 장소부터 지도에 표시돼요.</Text>
+          <View style={styles.exploreMapFallback}>
+            <View style={styles.exploreMapGrid} />
+            <View style={[styles.exploreMapFallbackPin, styles.exploreMapFallbackPinPrimary]}>
+              <Text style={styles.exploreMapFallbackPinText}>⌖</Text>
+            </View>
+            <View style={[styles.exploreMapFallbackPin, styles.exploreMapFallbackPinSecondary]}>
+              <Text style={styles.exploreMapFallbackPinSmallText}>맛집</Text>
+            </View>
+            <View style={[styles.exploreMapFallbackPin, styles.exploreMapFallbackPinTertiary]}>
+              <Text style={styles.exploreMapFallbackPinSmallText}>카페</Text>
+            </View>
+            <View style={styles.exploreMapEmpty}>
+              <Text style={styles.exploreMapEmptyTitle}>지도 미리보기 준비중</Text>
+              <Text style={styles.exploreMapEmptyCopy}>지도가 느리게 뜨면 지도 탭에서 같은 장소를 바로 확인할 수 있어요.</Text>
+              {focusedPlace ? (
+                <Pressable style={styles.exploreMapFallbackButton} onPress={() => onOpenMapPlace(focusedPlace)}>
+                  <Text style={styles.exploreMapFallbackButtonText}>지도 탭에서 보기</Text>
+                </Pressable>
+              ) : null}
+            </View>
           </View>
         )}
       </View>
@@ -773,16 +795,38 @@ function getPlaceImageUrls(place: CuratedPlace) {
   return Array.from(new Set(images)).slice(0, 6);
 }
 
+function getPlaceCoordinates(place: CuratedPlace) {
+  const coordinates = place.coordinates as
+    | {
+        latitude?: number;
+        longitude?: number;
+        lat?: number;
+        lng?: number;
+      }
+    | undefined;
+  if (!coordinates) return undefined;
+  const lat = Number(coordinates.latitude ?? coordinates.lat);
+  const lng = Number(coordinates.longitude ?? coordinates.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+  return { lat, lng };
+}
+
 function getStaticMapUrl(place: CuratedPlace, nearbyPlaces: CuratedPlace[]) {
   const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
-  if (!apiKey || !place.coordinates) return undefined;
-  const center = `${place.coordinates.latitude},${place.coordinates.longitude}`;
+  const centerCoordinates = getPlaceCoordinates(place);
+  if (!apiKey || !centerCoordinates) return undefined;
+  const center = `${centerCoordinates.lat},${centerCoordinates.lng}`;
   const markers = nearbyPlaces
-    .filter((item) => item.coordinates)
+    .map((item) => getPlaceCoordinates(item))
+    .filter((coordinates): coordinates is { lat: number; lng: number } => Boolean(coordinates))
     .slice(0, 8)
-    .map((item) => `markers=color:0xFF9F1C%7C${item.coordinates!.latitude},${item.coordinates!.longitude}`)
+    .map((coordinates, index) => {
+      const color = index === 0 ? "0x063F28" : "0xFF9F1C";
+      return `markers=color:${color}%7C${coordinates.lat},${coordinates.lng}`;
+    })
     .join("&");
-  return `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=13&size=640x520&scale=2&maptype=roadmap&${markers}&key=${apiKey}`;
+  const markerQuery = markers ? `&${markers}` : "";
+  return `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=13&size=640x520&scale=2&maptype=roadmap${markerQuery}&key=${apiKey}`;
 }
 
 function buildPlaceLongIntro(place: CuratedPlace) {
@@ -1046,6 +1090,72 @@ const styles = StyleSheet.create({
   exploreMapEmpty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 20 },
   exploreMapEmptyTitle: { color: colors.ink, fontSize: 18, fontWeight: "900" },
   exploreMapEmptyCopy: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 6, textAlign: "center", fontWeight: "800" },
+  exploreMapFallback: {
+    flex: 1,
+    position: "relative",
+    overflow: "hidden",
+    backgroundColor: "#FEF3C7"
+  },
+  exploreMapGrid: {
+    position: "absolute",
+    top: -30,
+    right: -80,
+    bottom: -30,
+    left: -80,
+    opacity: 0.55,
+    backgroundColor: "#FFF7DF",
+    borderWidth: 28,
+    borderColor: "#FFE3A5",
+    transform: [{ rotate: "-10deg" }]
+  },
+  exploreMapFallbackPin: {
+    position: "absolute",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 18,
+    elevation: 4
+  },
+  exploreMapFallbackPinPrimary: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    right: 34,
+    top: 30,
+    backgroundColor: "#063F28"
+  },
+  exploreMapFallbackPinSecondary: {
+    width: 62,
+    height: 38,
+    borderRadius: 999,
+    left: 28,
+    bottom: 44,
+    backgroundColor: colors.cyan
+  },
+  exploreMapFallbackPinTertiary: {
+    width: 58,
+    height: 34,
+    borderRadius: 999,
+    right: 48,
+    bottom: 54,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#F0D89A"
+  },
+  exploreMapFallbackPinText: { color: "#FFFFFF", fontSize: 28, fontWeight: "900" },
+  exploreMapFallbackPinSmallText: { color: "#271400", fontSize: 12, fontWeight: "900" },
+  exploreMapFallbackButton: {
+    marginTop: 14,
+    minHeight: 42,
+    borderRadius: 999,
+    backgroundColor: colors.cyan,
+    paddingHorizontal: 18,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  exploreMapFallbackButtonText: { color: "#271400", fontSize: 13, fontWeight: "900" },
   exploreMapCard: {
     borderRadius: 20,
     backgroundColor: "#FFF8E6",
