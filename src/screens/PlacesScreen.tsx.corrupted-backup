@@ -1,0 +1,2452 @@
+﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { Image, ImageBackground, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+
+import { AppShell } from "../components/AppShell";
+import { Header } from "../components/Header";
+import { curatedPlaces } from "../data/places";
+import { colors, shadow } from "../styles/theme";
+import type { CuratedPlace, Destination, LiveTravelInfo, PlaceReport, PlannerInput } from "../types";
+import { trackEvent } from "../utils/analytics";
+import { getMangoReviewCount } from "../utils/placeCommunity";
+
+type PlacesScreenProps = {
+  input: PlannerInput;
+  liveInfo: LiveTravelInfo;
+  savedPlaceIds: string[];
+  placeReports: PlaceReport[];
+  memberId?: string;
+  memberName?: string;
+  initialFilterId?: string;
+  initialDestination?: Destination;
+  reportOpenRequest?: number;
+  onToggleSavedPlace: (placeId: string) => void;
+  onSubmitPlaceReport: (report: PlaceReport) => void | Promise<void>;
+  onRemovePlaceReport: (reportId: string) => void;
+  onOpenMapPlace: (place: CuratedPlace) => void;
+  onRequireAuth?: () => void;
+  onMangoTemperatureChange?: (delta: number) => void;
+};
+
+type FilterId =
+  | "all"
+  | "food"
+  | "cafe"
+  | "massage"
+  | "rooftop"
+  | "karaoke"
+  | "shopping"
+  | "photo"
+  | "exchange"
+  | "korean"
+  | "chinese"
+  | "japanese"
+  | "vietnamese";
+
+type CommentVisitType = "visited" | "planned";
+
+type PlaceComment = {
+  id: string;
+  placeId: string;
+  memberName: string;
+  message: string;
+  createdAt: string;
+  rating?: number;
+  tags?: string[];
+  visitType?: CommentVisitType;
+  helpfulCount?: number;
+  source?: "user" | "google_reference";
+};
+
+type PlaceReportFormState = {
+  city: Destination;
+  reporterType: PlaceReport["reporterType"];
+  name: string;
+  googleMapsUri: string;
+  area: string;
+  category: PlaceReport["category"];
+  priceLevel: PlaceReport["priceLevel"];
+  reason: string;
+};
+
+const destinationTabs: Destination[] = ["?몄튂誘?, "?ㅻ궘", "?섑듃??, "?섎끂??, "?щ옃", "?멸씀??];
+
+const filters: Array<{ id: FilterId; label: string; match: (place: CuratedPlace) => boolean }> = [
+  { id: "all", label: "?꾩껜", match: () => true },
+  { id: "food", label: "留쏆쭛", match: (place) => place.category === "留쏆쭛" },
+  { id: "cafe", label: "移댄럹", match: (place) => place.category === "移댄럹" },
+  { id: "massage", label: "留덉궗吏", match: (place) => place.category === "留덉궗吏" },
+  { id: "rooftop", label: "猷⑦봽??, match: (place) => place.category === "諛?猷⑦봽?? || hasTag(place, ["猷⑦봽??, "移듯뀒??, "?대읇"]) },
+  { id: "karaoke", label: "媛?쇱삤耳", match: (place) => place.category === "媛?쇱삤耳" },
+  { id: "shopping", label: "?쇳븨", match: (place) => place.category === "?쇳븨" },
+  { id: "photo", label: "?ъ쭊紐낆냼", match: (place) => place.category === "?ъ쭊紐낆냼" },
+  { id: "exchange", label: "?섏쟾", match: (place) => place.category === "?섏쟾" },
+  { id: "korean", label: "?쒖떇??, match: (place) => hasTag(place, ["?쒖떇??, "?쒓뎅?닿???, "?쒓뎅?몄텛泥?]) || nameHas(place, ["korean", "bbq", "doya", "hanam"]) },
+  { id: "chinese", label: "以묒떇??, match: (place) => hasTag(place, ["以묒떇??]) || nameHas(place, ["chinese", "jjamppong", "jajang", "dim sum"]) },
+  { id: "japanese", label: "?쇱떇??, match: (place) => hasTag(place, ["?쇱떇??]) || nameHas(place, ["sushi", "ramen", "izakaya", "japanese"]) },
+  { id: "vietnamese", label: "踰좏듃???뚯떇", match: (place) => place.category === "留쏆쭛" && !hasTag(place, ["?쒖떇??, "以묒떇??, "?쇱떇??]) }
+];
+
+const shortcutFilters: FilterId[] = ["food", "cafe", "massage", "rooftop", "shopping", "photo", "exchange", "karaoke"];
+
+const placeCommunityStorageKey = "mangomap-place-comments-v2";
+const commentTagOptions = ["\uD63C\uBC25", "\uB370\uC774\uD2B8", "\uAC00\uC871", "\uC57C\uC2DD", "\uC0AC\uC9C4", "\uAC00\uC131\uBE44", "\uD55C\uAD6D\uC778 \uCD94\uCC9C", "\uC7AC\uBC29\uBB38"];
+const reportCategoryOptions = ["留쏆쭛", "移댄럹", "留덉궗吏", "猷⑦봽??, "媛?쇱삤耳", "?쇳븨", "?ъ쭊紐낆냼", "?섏쟾"];
+const reportPriceOptions = ["?媛", "蹂댄넻", "?꾨━誘몄뾼"];
+const reportReporterTypeOptions = ["嫄곗＜??, "理쒓렐 諛⑸Ц", "?ы뻾 以鍮?];
+
+function createReportForm(city: Destination, place?: CuratedPlace): PlaceReportFormState {
+  return {
+    city: place?.city ?? city,
+    reporterType: "理쒓렐 諛⑸Ц" as PlaceReport["reporterType"],
+    name: place?.name ?? "",
+    googleMapsUri: place?.googleMapsUri ?? "",
+    area: place?.area ?? place?.address ?? "",
+    category: (place?.category ?? "留쏆쭛") as PlaceReport["category"],
+    priceLevel: (place?.priceLevel ?? "蹂댄넻") as PlaceReport["priceLevel"],
+    reason: place ? `${place.name}??二쇱냼, ?곸뾽?쒓컙, ?ъ쭊, 硫붾돱 ???섏젙???뺣낫瑜??곸뼱二쇱꽭??` : ""
+  };
+}
+
+export function PlacesScreen({
+  input,
+  savedPlaceIds,
+  placeReports,
+  memberId,
+  memberName,
+  initialFilterId,
+  initialDestination,
+  reportOpenRequest,
+  onToggleSavedPlace,
+  onSubmitPlaceReport,
+  onOpenMapPlace,
+  onRequireAuth,
+  onMangoTemperatureChange
+}: PlacesScreenProps) {
+  const [selectedCity, setSelectedCity] = useState<Destination>(initialDestination ?? input.destination);
+  const [selectedFilterId, setSelectedFilterId] = useState<FilterId>(normalizeFilterId(initialFilterId));
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPlace, setSelectedPlace] = useState<CuratedPlace | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const [comments, setComments] = useState<PlaceComment[]>(loadComments);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [commentRating, setCommentRating] = useState(5);
+  const [commentVisitType, setCommentVisitType] = useState<CommentVisitType>("visited");
+  const [commentTags, setCommentTags] = useState<string[]>([]);
+  const [reportSheetOpen, setReportSheetOpen] = useState(false);
+  const [reportForm, setReportForm] = useState<PlaceReportFormState>(() => createReportForm(initialDestination ?? input.destination));
+  const [reportError, setReportError] = useState("");
+  const [reportSuccess, setReportSuccess] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+
+  const openReportSheet = (place?: CuratedPlace) => {
+    if (!memberId) {
+      onRequireAuth?.();
+      return;
+    }
+    setReportForm(createReportForm(selectedCity, place));
+    setReportError("");
+    setReportSuccess("");
+    setReportSheetOpen(true);
+  };
+
+  const closeReportSheet = () => {
+    if (reportSubmitting) return;
+    setReportSheetOpen(false);
+    setReportError("");
+    setReportSuccess("");
+  };
+
+  const updateReportForm = (updates: Partial<PlaceReportFormState>) => {
+    setReportForm((current) => ({ ...current, ...updates }));
+  };
+
+  const submitReportForm = async () => {
+    if (!memberId) {
+      onRequireAuth?.();
+      return;
+    }
+
+    const name = reportForm.name.trim();
+    const reason = reportForm.reason.trim();
+    if (!name) {
+      setReportError("?μ냼 ?대쫫???곸뼱二쇱꽭??");
+      return;
+    }
+    if (!reason) {
+      setReportError("臾댁뾿???쒕낫?섎뒗吏 ??以꾩씠?쇰룄 ?곸뼱二쇱꽭??");
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const report: PlaceReport = {
+      id: `place-report-${Date.now()}`,
+      createdAt: now,
+      updatedAt: now,
+      status: "寃?좎쨷" as PlaceReport["status"],
+      city: reportForm.city,
+      reporterType: reportForm.reporterType,
+      reporterId: memberId,
+      name,
+      googleMapsUri:
+        reportForm.googleMapsUri.trim() ||
+        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name} ${reportForm.area} ${reportForm.city}`)}`,
+      area: reportForm.area.trim() || String(reportForm.city),
+      category: reportForm.category,
+      priceLevel: reportForm.priceLevel,
+      reason,
+      mapReflectionStatus: "寃?좎쨷" as PlaceReport["mapReflectionStatus"],
+      viewCount: 0,
+      rewardPoints: 10
+    };
+
+    try {
+      setReportSubmitting(true);
+      await Promise.resolve(onSubmitPlaceReport(report));
+      setReportSuccess("?쒕낫媛 ?묒닔?먯뼱?? 留덉씠?섏씠吏?????쒕낫 ?꾪솴?먯꽌 ?곹깭瑜??뺤씤?????덉뼱??");
+      setReportForm(createReportForm(selectedCity));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "?좎떆 ???ㅼ떆 ?쒕룄?댁＜?몄슂.";
+      setReportError(`?쒕낫 ??μ뿉 ?ㅽ뙣?덉뼱?? ${message}`);
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (initialDestination) setSelectedCity(initialDestination);
+  }, [initialDestination]);
+
+  useEffect(() => {
+    if (!reportOpenRequest) return;
+    openReportSheet();
+  }, [reportOpenRequest]);
+
+  useEffect(() => {
+    if (initialFilterId) setSelectedFilterId(normalizeFilterId(initialFilterId));
+  }, [initialFilterId]);
+
+  useEffect(() => {
+    setShowAll(false);
+    setSelectedPlace(null);
+  }, [selectedCity, selectedFilterId, searchQuery]);
+
+  useEffect(() => {
+    saveComments(comments);
+  }, [comments]);
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (query.length < 2) return;
+    const timer = setTimeout(() => {
+      trackEvent("search_place", { query, city: selectedCity, filter: selectedFilterId });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery, selectedCity, selectedFilterId]);
+
+  useEffect(() => {
+    if (!selectedPlace) return;
+    trackEvent("view_place", { placeId: selectedPlace.id, city: selectedPlace.city, category: selectedPlace.category });
+  }, [selectedPlace]);
+
+  const selectedFilter = filters.find((filter) => filter.id === selectedFilterId) ?? filters[0];
+  const places = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return curatedPlaces
+      .filter((place) => place.city === selectedCity)
+      .filter((place) => selectedFilter.match(place))
+      .filter((place) => {
+        if (!query) return true;
+        return [place.name, place.area, place.address, place.oneLine, place.koreanTip, ...place.tags]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(query));
+      })
+      .sort((a, b) => scorePlace(b) - scorePlace(a));
+  }, [searchQuery, selectedCity, selectedFilter]);
+
+  const mustVisit = places.slice(0, 8);
+  const popular = places.slice(0, 12);
+  const visibleList = showAll ? places : popular.slice(0, 3);
+  const ratedPlaces = places.filter((place) => typeof place.rating === "number");
+  const averageRating = ratedPlaces.length
+    ? ratedPlaces.reduce((sum, place) => sum + (place.rating ?? 0), 0) / ratedPlaces.length
+    : 0;
+  const insightMetrics = [
+    {
+      label: "留앷퀬留??꾧린",
+      count: places.filter((place) => getMangoReviewCount(place) > 0).length,
+      hint: "?????꾧린 蹂댁쑀"
+    },
+    {
+      label: "?쒓뎅???꾧린/?쒓렇",
+      count: places.filter((place) => (place.koreanReviewSignal?.reviewCount ?? 0) > 0 || hasTag(place, ["?쒓뎅??異붿쿇", "?쒓뎅?닿???])).length,
+      hint: "?쒓뎅??留λ씫???덈뒗 ?μ냼"
+    },
+    {
+      label: "珥덊뻾??異붿쿇",
+      count: places.filter((place) => place.beginnerSafe).length,
+      hint: "泥?諛⑸Ц?먭? 怨좊Ⅴ湲??ъ?"
+    },
+    {
+      label: "?ㅼ젣 ?ъ쭊 ?덉쓬",
+      count: places.filter((place) => Boolean(place.photoName || place.photoNames?.length)).length,
+      hint: "留ㅼ옣/?μ냼 ?ъ쭊 ?뺤씤"
+    }
+  ].map((item) => ({
+    ...item,
+    percent: places.length ? Math.round((item.count / places.length) * 100) : 0
+  }));
+  const reportSheet = (
+    <PlaceReportSheet
+      visible={reportSheetOpen}
+      form={reportForm}
+      reportCount={placeReports.length}
+      error={reportError}
+      success={reportSuccess}
+      submitting={reportSubmitting}
+      onClose={closeReportSheet}
+      onChange={updateReportForm}
+      onSubmit={submitReportForm}
+    />
+  );
+
+  if (selectedPlace) {
+    return (
+      <AppShell>
+        <PlaceDetail
+          place={selectedPlace}
+          saved={savedPlaceIds.includes(selectedPlace.id)}
+          comments={comments.filter((comment) => comment.placeId === selectedPlace.id)}
+          commentDraft={commentDraft}
+          commentRating={commentRating}
+          commentVisitType={commentVisitType}
+          commentTags={commentTags}
+          onChangeComment={setCommentDraft}
+          onChangeCommentRating={setCommentRating}
+          onChangeCommentVisitType={setCommentVisitType}
+          onToggleCommentTag={(tag) => {
+            setCommentTags((current) =>
+              current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag].slice(0, 3)
+            );
+          }}
+          onBack={() => {
+            setSelectedPlace(null);
+            setCommentDraft("");
+            setCommentRating(5);
+            setCommentVisitType("visited");
+            setCommentTags([]);
+          }}
+          onToggleSaved={() => {
+            trackEvent("save_place", { placeId: selectedPlace.id, saved: !savedPlaceIds.includes(selectedPlace.id) });
+            onToggleSavedPlace(selectedPlace.id);
+          }}
+          onOpenMap={() => onOpenMapPlace(selectedPlace)}
+          onSharePlace={() => {
+            trackEvent("share_place", { placeId: selectedPlace.id, source: "place_detail" });
+            sharePlace(selectedPlace);
+          }}
+          onReportPlace={() => {
+            trackEvent("report_place", { placeId: selectedPlace.id, source: "place_detail" });
+            openReportSheet(selectedPlace);
+            return;
+            if (typeof window !== "undefined" && typeof window.alert === "function") {
+              window.alert("?곸뾽?쒓컙, 二쇱냼, ?ъ쭊 ?ㅻ쪟???ㅽ뙚 ?쒕낫濡??묒닔??二쇱꽭?? 寃????吏?꾩뿉 諛섏쁺?쇱슂.");
+            }
+          }}
+          onSubmitComment={() => {
+            const message = commentDraft.trim();
+            if (!message) return;
+            if (!memberName) {
+              onRequireAuth?.();
+              return;
+            }
+            trackEvent("comment_place", { placeId: selectedPlace.id, rating: commentRating, visitType: commentVisitType });
+            setComments((current) => [
+              {
+                id: `place-comment-${Date.now()}`,
+                placeId: selectedPlace.id,
+                memberName,
+                message,
+                rating: commentRating,
+                tags: commentTags,
+                visitType: commentVisitType,
+                helpfulCount: 0,
+                source: "user",
+                createdAt: new Date().toISOString()
+              },
+              ...current
+            ]);
+            onMangoTemperatureChange?.(commentVisitType === "visited" ? 0.2 : 0.1);
+            setCommentDraft("");
+            setCommentRating(5);
+            setCommentVisitType("visited");
+            setCommentTags([]);
+          }}
+        />
+        {reportSheet}
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell>
+      <Header eyebrow="?먯깋" title={`${selectedCity}??${selectedFilter.label}`} subtitle="留앷퀬留?異붿쿇怨??ы뻾???볤?????踰덉뿉 ?뺤씤?댁슂." />
+
+      <View style={styles.searchPanel}>
+        <View style={styles.searchBox}>
+          <Text style={styles.searchIcon}>??/Text>
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={`${selectedCity}?먯꽌 ?꾩껜 李얘린`}
+            placeholderTextColor="#A87813"
+            style={styles.searchInput}
+          />
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cityTabs}>
+          {destinationTabs.map((city) => (
+            <Pressable key={city} onPress={() => setSelectedCity(city)} style={[styles.cityPill, selectedCity === city && styles.cityPillActive]}>
+              <Text style={[styles.cityPillText, selectedCity === city && styles.cityPillTextActive]}>{city}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterTabs}>
+          {shortcutFilters.map((filterId) => {
+            const filter = filters.find((item) => item.id === filterId) ?? filters[0];
+            return (
+              <Pressable key={filter.id} onPress={() => setSelectedFilterId(filter.id)} style={[styles.filterPill, selectedFilterId === filter.id && styles.filterPillActive]}>
+                <Text style={styles.filterIcon}>{getFilterIcon(filter.id)}</Text>
+                <Text style={[styles.filterText, selectedFilterId === filter.id && styles.filterTextActive]}>{filter.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      <View style={styles.topFilterBar}>
+        <Pressable style={styles.outlineButton}>
+          <Text style={styles.outlineButtonText}>?곸뾽 以?/Text>
+        </Pressable>
+        <Pressable style={styles.outlineButton}>
+          <Text style={styles.outlineButtonText}>?붾━ ??/Text>
+        </Pressable>
+        <Pressable style={styles.outlineButton}>
+          <Text style={styles.outlineButtonText}>媛寃???/Text>
+        </Pressable>
+        <Pressable style={styles.outlineButtonWide}>
+          <Text style={styles.outlineButtonText}>?꾪꽣 ??蹂닿린</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.sectionBlock}>
+        <Text style={styles.sectionTitle}>?쒓뎅??異붿쿇 肄붿뒪</Text>
+        <Text style={styles.sectionCopy}>{selectedCity}?먯꽌 ?꾧린媛 留롪퀬 ?숈꽑???ｊ린 ?ъ슫 ?μ냼瑜?癒쇱? 蹂댁뿬?쒕젮??</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carouselTrack}>
+          {mustVisit.map((place) => (
+            <Pressable key={place.id} style={styles.heroCard} onPress={() => setSelectedPlace(place)}>
+              {getPlaceImageUrl(place) ? (
+                <ImageBackground source={{ uri: getPlaceImageUrl(place) }} style={styles.heroImage} imageStyle={styles.heroImageRadius}>
+                  <Pressable style={styles.saveBubble} onPress={() => onToggleSavedPlace(place.id)}>
+                    <Text style={styles.saveBubbleText}>{savedPlaceIds.includes(place.id) ? "?? : "??}</Text>
+                  </Pressable>
+                  <View style={styles.awardBadge}>
+                    <Text style={styles.awardBadgeText}>留앷퀬??/Text>
+                  </View>
+                </ImageBackground>
+              ) : (
+                <View style={[styles.heroImage, styles.heroImageRadius, styles.photoPendingBox]}>
+                  <Pressable style={styles.saveBubble} onPress={() => onToggleSavedPlace(place.id)}>
+                    <Text style={styles.saveBubbleText}>{savedPlaceIds.includes(place.id) ? "?? : "??}</Text>
+                  </Pressable>
+                  <Text style={styles.photoPendingText}>?ъ쭊 以鍮꾩쨷</Text>
+                  <Text style={styles.photoPendingSubtext}>?ㅼ젣 留ㅼ옣 ?ъ쭊留??쒖떆?댁슂</Text>
+                </View>
+              )}
+              <Text style={styles.guideBadge}>{getVerificationStatus(place, comments.filter((comment) => comment.placeId === place.id).length).label}</Text>
+              <Text style={styles.heroTitle} numberOfLines={2}>{place.name}</Text>
+              <RatingLine place={place} />
+              <Text style={styles.heroMeta} numberOfLines={2}>{getBestUseCase(place)}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+
+      <View style={styles.sectionBlock}>
+        <Text style={styles.sectionTitle}>?멸린 {selectedFilter.label}</Text>
+        <View style={styles.popularList}>
+          {visibleList.map((place) => (
+            <Pressable key={place.id} style={styles.popularRow} onPress={() => setSelectedPlace(place)}>
+              <PopularPhotoPreview place={place} />
+              <View style={styles.popularBody}>
+                <Text style={styles.guideBadgeSmall}>{getTrustCopy(place)}</Text>
+                <Text style={styles.popularTitle} numberOfLines={2}>{place.name}</Text>
+                <RatingLine place={place} compact />
+                <Text style={styles.popularMeta} numberOfLines={2}>{buildMeta(place)} 쨌 {getBestUseCase(place)}</Text>
+              </View>
+              <Pressable style={styles.rowSaveButton} onPress={() => onToggleSavedPlace(place.id)}>
+                <Text style={styles.rowSaveText}>{savedPlaceIds.includes(place.id) ? "?? : "??}</Text>
+              </Pressable>
+            </Pressable>
+          ))}
+        </View>
+        {places.length > visibleList.length ? (
+          <Pressable style={styles.allButton} onPress={() => setShowAll((value) => !value)}>
+            <Text style={styles.allButtonText}>{showAll ? "?묎린" : `紐⑤뱺 ${selectedFilter.label} 蹂닿린`}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View style={styles.sectionBlock}>
+        <View style={styles.insightHeader}>
+          <View style={styles.insightTitleBox}>
+            <Text style={styles.sectionTitle}>?쒓뎅??湲곗? ?됯?</Text>
+            <Text style={styles.insightHelp}>
+              ?꾩옱 紐⑸줉???됱젏, 留앷퀬留??꾧린, ?쒓뎅???쒓렇 湲곗??쇰줈 ?붿빟??李멸퀬 吏?쒖삁??
+            </Text>
+          </View>
+          <Text style={styles.insightCount}>鍮꾧탳 {places.length}怨?/Text>
+        </View>
+        <View style={styles.insightCard}>
+          <View style={styles.insightScorePanel}>
+            <Text style={styles.insightScoreLabel}>紐⑸줉 ?됯퇏</Text>
+            <Text style={styles.insightScore}>{averageRating ? averageRating.toFixed(1) : "-"}</Text>
+            <Text style={styles.insightScoreCaption}>5??留뚯젏 ?됱젏</Text>
+          </View>
+          <View style={styles.insightBars}>
+            {insightMetrics.map((item) => (
+              <View key={item.label} style={styles.insightBarRow}>
+                <View style={styles.insightBarTop}>
+                  <Text style={styles.insightBarLabel}>{item.label}</Text>
+                  <Text style={styles.insightBarValue}>{item.count}怨?/Text>
+                </View>
+                <Text style={styles.insightBarHint}>{item.hint}</Text>
+                <View style={styles.insightTrack}>
+                  <View style={[styles.insightFill, { width: `${Math.max(item.percent, item.count > 0 ? 10 : 0)}%` }]} />
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+        {places[0] ? (
+          <Pressable style={styles.insightMapButton} onPress={() => onOpenMapPlace(places[0])}>
+            <Text style={styles.insightMapButtonText}>吏?꾩뿉??蹂닿린</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {reportSheet}
+    </AppShell>
+  );
+}
+
+function PlaceReportSheet({
+  visible,
+  form,
+  reportCount,
+  error,
+  success,
+  submitting,
+  onClose,
+  onChange,
+  onSubmit
+}: {
+  visible: boolean;
+  form: PlaceReportFormState;
+  reportCount: number;
+  error: string;
+  success: string;
+  submitting: boolean;
+  onClose: () => void;
+  onChange: (updates: Partial<PlaceReportFormState>) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.reportOverlay}>
+        <Pressable style={styles.reportBackdrop} onPress={onClose} />
+        <View style={styles.reportSheet}>
+          <View style={styles.reportSheetHeader}>
+            <View style={styles.reportSheetTitleBox}>
+              <Text style={styles.reportSheetEyebrow}>留앷퀬留??쒕낫</Text>
+              <Text style={styles.reportSheetTitle}>?μ냼 ?뺣낫瑜??뚮젮二쇱꽭??/Text>
+              <Text style={styles.reportSheetCopy}>醫뗭븯???μ냼???섎せ???뺣낫瑜??щ━硫?寃????吏?꾩뿉 諛섏쁺?쇱슂.</Text>
+            </View>
+            <Pressable accessibilityRole="button" onPress={onClose} style={styles.reportCloseButton}>
+              <Text style={styles.reportCloseText}>?リ린</Text>
+            </Pressable>
+          </View>
+
+          {success ? (
+            <View style={styles.reportSuccessBox}>
+              <Text style={styles.reportSuccessTitle}>?묒닔 ?꾨즺</Text>
+              <Text style={styles.reportSuccessText}>{success}</Text>
+              <Pressable accessibilityRole="button" onPress={onClose} style={styles.reportSubmitButton}>
+                <Text style={styles.reportSubmitText}>?뺤씤</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.reportFormContent}>
+              <Text style={styles.reportHint}>?꾩옱 ?묒닔???쒕낫 {reportCount}嫄?/Text>
+              <ReportTextInput label="?μ냼 ?대쫫" value={form.name} placeholder="?? ?꾩빞吏щ퐬 1援곗젏" onChangeText={(value) => onChange({ name: value })} />
+              <ReportTextInput label="?꾩튂/吏?? value={form.area} placeholder="?? 1援? ??ㅻ뵒?? 踰ㅽ깂?쒖옣 洹쇱쿂" onChangeText={(value) => onChange({ area: value })} />
+              <ReportTextInput label="Google Maps 留곹겕" value={form.googleMapsUri} placeholder="?놁쑝硫?鍮꾩썙???쇱슂" onChangeText={(value) => onChange({ googleMapsUri: value })} />
+
+              <ReportChipGroup
+                label="移댄뀒怨좊━"
+                options={reportCategoryOptions}
+                value={String(form.category)}
+                onChange={(value) => onChange({ category: value as PlaceReport["category"] })}
+              />
+              <ReportChipGroup
+                label="媛寃⑸?"
+                options={reportPriceOptions}
+                value={String(form.priceLevel)}
+                onChange={(value) => onChange({ priceLevel: value as PlaceReport["priceLevel"] })}
+              />
+              <ReportChipGroup
+                label="?쒕낫???좏삎"
+                options={reportReporterTypeOptions}
+                value={String(form.reporterType)}
+                onChange={(value) => onChange({ reporterType: value as PlaceReport["reporterType"] })}
+              />
+
+              <ReportTextInput
+                label="?쒕낫 ?댁슜"
+                value={form.reason}
+                placeholder="?? ?곸뾽?쒓컙??諛붾뚯뿀?댁슂 / ?ъ쭊???ㅼ젣 留ㅼ옣怨??щ씪??/ ?쒓뎅?몄씠 媛湲?醫뗭븘??
+                multiline
+                onChangeText={(value) => onChange({ reason: value })}
+              />
+
+              {error ? <Text style={styles.reportErrorText}>{error}</Text> : null}
+              <Pressable
+                accessibilityRole="button"
+                disabled={submitting}
+                onPress={onSubmit}
+                style={[styles.reportSubmitButton, submitting && styles.reportSubmitButtonDisabled]}
+              >
+                <Text style={styles.reportSubmitText}>{submitting ? "?묒닔 以?.." : "?쒕낫 ?묒닔?섍린"}</Text>
+              </Pressable>
+            </ScrollView>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function ReportTextInput({
+  label,
+  value,
+  placeholder,
+  multiline,
+  onChangeText
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  multiline?: boolean;
+  onChangeText: (value: string) => void;
+}) {
+  return (
+    <View style={styles.reportField}>
+      <Text style={styles.reportFieldLabel}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#9CA3AF"
+        multiline={multiline}
+        style={[styles.reportInput, multiline && styles.reportTextArea]}
+      />
+    </View>
+  );
+}
+
+function ReportChipGroup({
+  label,
+  options,
+  value,
+  onChange
+}: {
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <View style={styles.reportField}>
+      <Text style={styles.reportFieldLabel}>{label}</Text>
+      <View style={styles.reportChipRow}>
+        {options.map((option) => (
+          <Pressable
+            key={option}
+            accessibilityRole="button"
+            onPress={() => onChange(option)}
+            style={[styles.reportChoiceChip, value === option && styles.reportChoiceChipActive]}
+          >
+            <Text style={[styles.reportChoiceText, value === option && styles.reportChoiceTextActive]}>{option}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function PlaceDetail({
+  place,
+  saved,
+  comments,
+  commentDraft,
+  commentRating,
+  commentVisitType,
+  commentTags,
+  onChangeComment,
+  onChangeCommentRating,
+  onChangeCommentVisitType,
+  onToggleCommentTag,
+  onBack,
+  onToggleSaved,
+  onOpenMap,
+  onSharePlace,
+  onReportPlace,
+  onSubmitComment
+}: {
+  place: CuratedPlace;
+  saved: boolean;
+  comments: PlaceComment[];
+  commentDraft: string;
+  commentRating: number;
+  commentVisitType: CommentVisitType;
+  commentTags: string[];
+  onChangeComment: (value: string) => void;
+  onChangeCommentRating: (value: number) => void;
+  onChangeCommentVisitType: (value: CommentVisitType) => void;
+  onToggleCommentTag: (tag: string) => void;
+  onBack: () => void;
+  onToggleSaved: () => void;
+  onOpenMap: () => void;
+  onSharePlace: () => void;
+  onReportPlace: () => void;
+  onSubmitComment: () => void;
+}) {
+  const { width: viewportWidth } = useWindowDimensions();
+  const galleryImages = useMemo(() => getPlaceImageUrls(place), [place]);
+  const referenceComments = useMemo(() => buildReferenceComments(place), [place]);
+  const allReviewComments = useMemo(() => [...comments, ...referenceComments], [comments, referenceComments]);
+  const visibleComments = allReviewComments.slice(0, 8);
+  const introParagraphs = useMemo(() => buildPlaceLongIntro(place, visibleComments), [place, visibleComments]);
+  const featureBullets = useMemo(() => buildPlaceFeatures(place), [place]);
+  const recommendationSituations = useMemo(() => getRecommendedSituations(place), [place]);
+  const aspectScores = useMemo(() => getAspectScores(place), [place]);
+  const realCommentCount = allReviewComments.length;
+  const displayRating = useMemo(() => getDisplayRatingFromComments(place, allReviewComments), [place, allReviewComments]);
+  const reviewBreakdown = useMemo(() => getRatingBreakdown(allReviewComments), [allReviewComments]);
+  const verification = useMemo(() => getVerificationStatus(place, realCommentCount), [place, realCommentCount]);
+  const partnerBenefit = place.partnerBenefit?.status === "active" ? place.partnerBenefit : undefined;
+  const koreanSummary = useMemo(() => getKoreanTravelerSummary(place, realCommentCount), [place, realCommentCount]);
+  const visitChecks = useMemo(() => getVisitCheckItems(place), [place]);
+  const detailScrollRef = useRef<ScrollView | null>(null);
+  const sectionOffsets = useRef<Record<"photos" | "overview" | "comments", number>>({
+    photos: 0,
+    overview: 0,
+    comments: 0
+  });
+  const [activeDetailTab, setActiveDetailTab] = useState<"photos" | "overview" | "comments">("photos");
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const galleryFrameWidth = Math.max(286, Math.min(viewportWidth - 36, 420));
+
+  useEffect(() => {
+    setActivePhotoIndex(0);
+  }, [place.id]);
+
+  const scrollToDetailSection = (section: "photos" | "overview" | "comments") => {
+    setActiveDetailTab(section);
+    const fallbackOffsets = {
+      photos: 0,
+      overview: galleryFrameWidth + 360,
+      comments: galleryFrameWidth + 1320
+    };
+    const targetY = section === "photos" ? 0 : Math.max((sectionOffsets.current[section] || fallbackOffsets[section]) - 12, 0);
+    const scroll = () => {
+      const targetElement =
+        typeof document !== "undefined" && typeof document.getElementById === "function"
+          ? document.getElementById(`place-detail-${section}`)
+          : null;
+      targetElement?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+      const scrollRef = detailScrollRef.current as unknown as {
+        scrollTo?: (options: { y?: number; x?: number; animated?: boolean }) => void;
+        scrollResponderScrollTo?: (options: { y?: number; x?: number; animated?: boolean }) => void;
+      } | null;
+      scrollRef?.scrollTo?.({ y: targetY, animated: true });
+      scrollRef?.scrollResponderScrollTo?.({ y: targetY, animated: true });
+    };
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(scroll);
+    } else {
+      scroll();
+    }
+    setTimeout(scroll, 80);
+  };
+  const scrollToPhoto = (index: number) => {
+    const nextIndex = Math.max(0, Math.min(index, galleryImages.length - 1));
+    setActivePhotoIndex(nextIndex);
+  };
+
+  return (
+    <View style={styles.detailPage}>
+      <View style={styles.detailTopBar}>
+        <Pressable onPress={onBack} style={styles.backButton}>
+          <Text style={styles.backButtonText}>{"<"}</Text>
+        </Pressable>
+        <View style={styles.detailActions}>
+          <Pressable onPress={onToggleSaved} style={[styles.detailIconButton, saved && styles.detailIconButtonActive]}>
+            <Text style={styles.detailIconText}>{saved ? "\uCC1C\uB428" : "\uC800\uC7A5"}</Text>
+          </Pressable>
+          <Pressable onPress={onSharePlace} style={styles.detailIconButton}>
+            <Text style={styles.detailIconText}>{"\uACF5\uC720"}</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.detailTabs}>
+        {([
+          ["photos", "\uC0AC\uC9C4"],
+          ["overview", "\uAC1C\uC694"],
+          ["comments", "\uB313\uAE00"]
+        ] as const).map(([section, label]) => (
+          <Pressable key={section} style={styles.detailTabButton} onPress={() => scrollToDetailSection(section)}>
+            <Text style={[styles.detailTab, activeDetailTab === section && styles.detailTabActive]}>{label}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <ScrollView
+        ref={detailScrollRef}
+        style={styles.detailBodyScroll}
+        contentContainerStyle={styles.detailContent}
+        scrollEventThrottle={16}
+        onScroll={(event) => {
+          const y = event.nativeEvent.contentOffset.y + 90;
+          if (sectionOffsets.current.comments > 0 && y >= sectionOffsets.current.comments) {
+            setActiveDetailTab("comments");
+          } else if (sectionOffsets.current.overview > 0 && y >= sectionOffsets.current.overview) {
+            setActiveDetailTab("overview");
+          } else {
+            setActiveDetailTab("photos");
+          }
+        }}
+      >
+      <View
+        nativeID="place-detail-photos"
+        style={styles.detailPhotoStage}
+        onLayout={(event) => {
+          sectionOffsets.current.photos = event.nativeEvent.layout.y;
+        }}
+      >
+        {galleryImages.length > 0 ? (
+          <>
+            <View style={[styles.detailPhotoFrame, { width: galleryFrameWidth }]}>
+              <Image source={{ uri: galleryImages[activePhotoIndex] }} style={styles.detailImage} />
+              {activePhotoIndex === 0 ? (
+                <View style={styles.awardPhotoBadge}>
+                  <Text style={styles.awardPhotoBadgeText}>{"\uB9DD\uACE0\uD53D"}</Text>
+                </View>
+              ) : null}
+              <View style={styles.photoIndexBadge}>
+                <Text style={styles.photoIndexText}>{activePhotoIndex + 1} / {galleryImages.length}</Text>
+              </View>
+            </View>
+            <View style={styles.photoCountBadge}>
+              <Text style={styles.photoCountText}>{"\uC0AC\uC9C4 " + galleryImages.length + "\uC7A5"}</Text>
+            </View>
+            {galleryImages.length > 1 ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => scrollToPhoto((activePhotoIndex - 1 + galleryImages.length) % galleryImages.length)}
+                style={styles.prevPhotoButton}
+              >
+                <Text style={styles.nextPhotoText}>{"\u2190"}</Text>
+              </Pressable>
+            ) : null}
+            {galleryImages.length > 1 ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => scrollToPhoto((activePhotoIndex + 1) % galleryImages.length)}
+                style={styles.nextPhotoButton}
+              >
+                <Text style={styles.nextPhotoText}>{"\u2192"}</Text>
+              </Pressable>
+            ) : null}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailRail}>
+              {galleryImages.map((uri, index) => (
+                <Pressable
+                  key={"thumb-" + uri + "-" + index}
+                  accessibilityRole="button"
+                  onPress={() => scrollToPhoto(index)}
+                  style={[styles.thumbnailFrame, activePhotoIndex === index && styles.thumbnailFrameActive]}
+                >
+                  <Image source={{ uri }} style={styles.thumbnailImage} />
+                </Pressable>
+              ))}
+            </ScrollView>
+          </>
+        ) : (
+          <View style={styles.detailPhotoEmpty}>
+            <Text style={styles.detailPhotoEmptyTitle}>?ъ쭊 以鍮꾩쨷</Text>
+            <Text style={styles.detailPhotoEmptyCopy}>?ㅼ젣 留ㅼ옣 ?ъ쭊?대굹 Google Place Photo媛 ?뺤씤??寃쎌슦?먮쭔 蹂댁뿬以섏슂.</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.detailSection}>
+        <View style={styles.trustHero}>
+          <View style={styles.trustHeroHeader}>
+            <Text style={styles.trustBadge}>{verification.label}</Text>
+            <Text style={styles.trustScore}>{getTrustScore(place)}%</Text>
+          </View>
+          <Text style={styles.trustHeroTitle}>{verification.copy}</Text>
+          <View style={styles.trustMetricGrid}>
+            <TrustMetric title={"\uD55C\uAD6D\uC778 \uD6C4\uAE30"} value={formatRealCommentCount(realCommentCount)} />
+            <TrustMetric title={"\uCD5C\uADFC \uC5C5\uB370\uC774\uD2B8"} value={getRecentUpdateDate(place)} />
+            <TrustMetric title={"\uC2E0\uB8B0 \uADFC\uAC70"} value={getTrustCopy(place)} />
+          </View>
+        </View>
+
+        <Text style={styles.detailTitle}>{place.name}</Text>
+        <RatingLine place={place} large reviewCount={realCommentCount} />
+        <Text style={styles.detailMeta}>{buildMeta(place)}</Text>
+        <View style={styles.detailLinkRow}>
+          <Pressable onPress={onOpenMap}><Text style={styles.detailLink}>{"\uC9C0\uB3C4\uC5D0\uC11C \uBCF4\uAE30"}</Text></Pressable>
+          <Pressable onPress={onReportPlace}><Text style={styles.detailLink}>{"\uC815\uBCF4 \uC218\uC815 \uC81C\uBCF4"}</Text></Pressable>
+        </View>
+      </View>
+
+      <View style={styles.koreanSummaryCard}>
+        <Text style={styles.koreanSummaryEyebrow}>{"\uD55C\uAD6D\uC778 \uAE30\uC900 \uC694\uC57D"}</Text>
+        <Text style={styles.koreanSummaryTitle}>{koreanSummary.headline}</Text>
+        <Text style={styles.koreanSummaryCopy}>{koreanSummary.copy}</Text>
+        <View style={styles.koreanSummaryGrid}>
+          {koreanSummary.points.map((point) => (
+            <View key={point.title} style={styles.koreanSummaryPoint}>
+              <Text style={styles.koreanSummaryPointTitle}>{point.title}</Text>
+              <Text style={styles.koreanSummaryPointValue}>{point.value}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View
+        nativeID="place-detail-overview"
+        style={styles.detailSection}
+        onLayout={(event) => {
+          sectionOffsets.current.overview = event.nativeEvent.layout.y;
+        }}
+      >
+        <Text style={styles.detailSectionTitle}>{"\uC18C\uAC1C"}</Text>
+        {introParagraphs.map((paragraph) => (
+          <Text key={paragraph} style={styles.detailParagraph}>{paragraph}</Text>
+        ))}
+        <View style={styles.situationBox}>
+          <Text style={styles.situationTitle}>{"\uCD94\uCC9C \uC0C1\uD669"}</Text>
+          <View style={styles.situationChips}>
+            {recommendationSituations.map((situation) => (
+              <Text key={situation} style={styles.situationChip}>{situation}</Text>
+            ))}
+          </View>
+        </View>
+        <View style={styles.detailInfoGrid}>
+          <InfoItem title={"\uAC00\uACA9\uB300"} value={getPriceDisplay(place)} />
+          <InfoItem title={"\uC601\uC5C5\uC2DC\uAC04"} value={getOpeningHoursLabel(place)} />
+          <InfoItem title={"\uCD94\uCC9C \uC2DC\uAC04"} value={place.bestTime.join(" \u00B7 ") || "\uBC29\uBB38 \uC804 \uD655\uC778"} />
+          <InfoItem title={"\uC9C0\uC5ED"} value={place.area ?? place.city} />
+        </View>
+        <View style={styles.visitCheckPanel}>
+          <Text style={styles.visitCheckTitle}>{"\uBC29\uBB38 \uC804 \uCCB4\uD06C"}</Text>
+          {visitChecks.map((item) => (
+            <View key={item.title} style={styles.visitCheckRow}>
+              <View style={styles.visitCheckDot} />
+              <View style={styles.visitCheckTextBox}>
+                <Text style={styles.visitCheckLabel}>{item.title}</Text>
+                <Text style={styles.visitCheckValue}>{item.value}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.detailSection}>
+        <Text style={styles.detailSectionTitle}>{"\uD55C\uB208\uC5D0 \uBCF4\uAE30"}</Text>
+        <View style={styles.featureList}>
+          {featureBullets.map((feature) => (
+            <View key={feature.title} style={styles.featureRow}>
+              <Text style={styles.featureIcon}>{feature.icon}</Text>
+              <View style={styles.featureTextBox}>
+                <Text style={styles.featureTitle}>{feature.title}</Text>
+                <Text style={styles.featureCopy}>{feature.copy}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View style={[styles.detailBenefitSection, partnerBenefit && styles.detailPartnerBenefitSection]}>
+        <View style={styles.benefitHeader}>
+          <Text style={styles.detailSectionTitle}>留앷퀬留??쒗깮</Text>
+          <Text style={[styles.benefitBadge, partnerBenefit && styles.benefitBadgeActive]}>
+            {partnerBenefit ? "?쒗쑕 ?쒗깮" : "?쒗쑕 以鍮꾩쨷"}
+          </Text>
+        </View>
+        <Text style={styles.benefitTitle}>{partnerBenefit?.title ?? "留앷퀬留??덉뿉???ъ쭊, ?꾧린, ?꾩튂瑜??댁뼱???뺤씤?댁슂."}</Text>
+        <Text style={styles.benefitCopy}>
+          {partnerBenefit?.summary ??
+            "?ㅼ젣 ?μ냼 ?곗씠?곗? ?쒓뎅???꾧린 ?먮쫫?????붾㈃??紐⑥븯?댁슂. ?꾩튂瑜??ㅼ떆 蹂닿퀬 ?띠쑝硫?留앷퀬留?吏?꾩뿉??諛붾줈 ?댁뼱???뺤씤?섎㈃ ?⑸땲??"}
+        </Text>
+        {partnerBenefit ? (
+          <View style={styles.benefitUseBox}>
+            <Text style={styles.benefitUseLabel}>留ㅼ옣?먯꽌 ?대젃寃?留먰븯硫??쇱슂</Text>
+            <Text style={styles.benefitUseText}>"留앷퀬留?蹂닿퀬 ?붿뼱??"</Text>
+            <Text style={styles.benefitGuideText}>{partnerBenefit.usageGuide}</Text>
+            <View style={styles.benefitTermList}>
+              {partnerBenefit.terms.map((term) => (
+                <View key={term} style={styles.benefitTermRow}>
+                  <View style={styles.benefitTermDot} />
+                  <Text style={styles.benefitTermText}>{term}</Text>
+                </View>
+              ))}
+            </View>
+            {partnerBenefit.verifiedAt ? (
+              <Text style={styles.benefitVerifiedText}>?쒗깮 ?깅줉??{partnerBenefit.verifiedAt}</Text>
+            ) : null}
+          </View>
+        ) : null}
+        <View style={styles.benefitActionRow}>
+          <Pressable accessibilityRole="button" onPress={onOpenMap} style={styles.benefitPrimaryButton}>
+            <Text style={styles.benefitPrimaryText}>{partnerBenefit ? "?꾩튂 ?뺤씤?섍퀬 諛⑸Ц" : "留앷퀬留?吏?꾩뿉??蹂닿린"}</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={partnerBenefit ? onSharePlace : onReportPlace} style={styles.benefitSecondaryButton}>
+            <Text style={styles.benefitSecondaryText}>{partnerBenefit ? "移쒓뎄?먭쾶 怨듭쑀" : "?뺣낫 ?섏젙 ?쒕낫"}</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.detailSection}>
+        <Text style={styles.detailSectionTitle}>{"\uD3C9\uC810 \uC2DC\uAC01\uD654"}</Text>
+        <View style={styles.reviewScoreCard}>
+          <View style={styles.reviewScoreSummary}>
+            <Text style={styles.reviewBigScore}>{formatRating(displayRating)}</Text>
+            <Text style={styles.reviewScoreLabel}>{"\uD55C\uAD6D\uC778 \uCCB4\uAC10 \uC88B\uC74C"}</Text>
+            <RatingDots rating={displayRating} />
+            <Text style={styles.reviewScoreSub}>{getReviewBasisLabel(realCommentCount)}</Text>
+          </View>
+          <View style={styles.reviewBars}>
+            {reviewBreakdown.map((row) => (
+              <RatingBreakdownRow key={row.label} label={row.label} count={row.count} percent={row.percent} />
+            ))}
+          </View>
+        </View>
+        <View style={styles.aspectGrid}>
+          {aspectScores.map((row) => (
+            <RatingAspect key={row.label} label={row.label} score={row.score} />
+          ))}
+        </View>
+      </View>
+
+      <View
+        nativeID="place-detail-comments"
+        style={styles.detailSection}
+        onLayout={(event) => {
+          sectionOffsets.current.comments = event.nativeEvent.layout.y;
+        }}
+      >
+        <View style={styles.commentHeader}>
+          <Text style={styles.detailSectionTitle}>{"\uD55C\uAD6D\uC778 \uD6C4\uAE30"}</Text>
+          <Text style={styles.commentCount}>{formatRealCommentCount(realCommentCount)}</Text>
+        </View>
+        <View style={styles.commentComposer}>
+          <View style={styles.commentModeRow}>
+            {([
+              ["visited", "\uBC29\uBB38 \uC644\uB8CC"],
+              ["planned", "\uAC00\uBCFC \uC608\uC815"]
+            ] as const).map(([value, label]) => (
+              <Pressable
+                key={value}
+                onPress={() => onChangeCommentVisitType(value)}
+                style={[styles.commentModeButton, commentVisitType === value && styles.commentModeButtonActive]}
+              >
+                <Text style={[styles.commentModeText, commentVisitType === value && styles.commentModeTextActive]}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <View style={styles.commentRatingRow}>
+            <Text style={styles.commentRatingLabel}>{"\uB0B4 \uD3C9\uC810"}</Text>
+            {[1, 2, 3, 4, 5].map((score) => (
+              <Pressable key={score} onPress={() => onChangeCommentRating(score)} style={[styles.commentRatingDot, score <= commentRating && styles.commentRatingDotActive]} />
+            ))}
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.commentTagRail}>
+            {commentTagOptions.map((tag) => (
+              <Pressable key={tag} onPress={() => onToggleCommentTag(tag)} style={[styles.commentTagButton, commentTags.includes(tag) && styles.commentTagButtonActive]}>
+                <Text style={[styles.commentTagText, commentTags.includes(tag) && styles.commentTagTextActive]}>{tag}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          <View style={styles.commentBox}>
+            <TextInput
+              value={commentDraft}
+              onChangeText={onChangeComment}
+              placeholder={"媛寃? 留? 遺꾩쐞湲? ?쒓뎅???낆옣?먯꽌 醫뗭븯???먯쓣 ?④꺼二쇱꽭??}
+              placeholderTextColor="#9CA3AF"
+              style={styles.commentInput}
+            />
+            <Pressable style={styles.commentSubmit} onPress={onSubmitComment}>
+              <Text style={styles.commentSubmitText}>{"\uB4F1\uB85D"}</Text>
+            </Pressable>
+          </View>
+        </View>
+        {visibleComments.length > 0 ? visibleComments.map((comment) => (
+          <View key={comment.id} style={styles.commentCard}>
+            <View style={styles.commentAvatar}>
+              <Text style={styles.commentAvatarText}>{comment.memberName.slice(0, 1)}</Text>
+            </View>
+            <View style={styles.commentBody}>
+              <View style={styles.commentTopLine}>
+                <Text style={styles.commentName}>{comment.memberName}</Text>
+                <Text style={styles.commentDate}>{formatCommentDate(comment.createdAt)}</Text>
+              </View>
+              <View style={styles.commentMetaRow}>
+                <RatingDots rating={comment.rating ?? 4.8} small />
+                <Text style={styles.commentVisitBadge}>
+                  {comment.source === "google_reference" ? "李멸퀬 ?꾧린" : comment.visitType === "planned" ? "\uAC00\uBCFC \uC608\uC815" : "\uBC29\uBB38 \uC644\uB8CC"}
+                </Text>
+              </View>
+              <Text style={styles.commentMessage}>{comment.message}</Text>
+              {comment.tags && comment.tags.length > 0 ? (
+                <View style={styles.commentTags}>
+                  {comment.tags.map((tag) => (
+                    <Text key={tag} style={styles.commentTagPill}>{tag}</Text>
+                  ))}
+                </View>
+              ) : null}
+              <Pressable style={styles.helpfulButton}>
+                <Text style={styles.helpfulButtonText}>{"\uB3C4\uC6C0\uB3FC\uC694 " + (comment.helpfulCount ?? 0)}</Text>
+              </Pressable>
+            </View>
+          </View>
+        )) : (
+          <View style={styles.emptyCommentCard}>
+            <Text style={styles.emptyCommentTitle}>?꾩쭅 ?쒓뎅???꾧린媛 ?놁뼱??/Text>
+            <Text style={styles.emptyCommentCopy}>泥?諛⑸Ц ?곸쓣 ?④린硫??ㅼ쓬 ?ы뻾?먭? ??鍮좊Ⅴ寃?寃곗젙?????덉뼱??</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.detailReportSection}>
+        <Text style={styles.detailSectionTitle}>?μ냼 ?뺣낫 ?쒕낫</Text>
+        <Text style={styles.detailParagraph}>?곸뾽?쒓컙, 媛寃? 二쇱냼, ?ъ쭊???щ씪議뚮떎硫?留앷퀬??寃?좊줈 ?낅뜲?댄듃?댁슂.</Text>
+        <View style={styles.reportChipGrid}>
+          {["?곸뾽?쒓컙 蹂寃?, "二쇱냼 ?ㅻ쪟", "?ъ쭊 ?쒕낫", "?먯뾽/?댁쟾"].map((item) => (
+            <Text key={item} style={styles.reportChip}>{item}</Text>
+          ))}
+        </View>
+        <Pressable accessibilityRole="button" onPress={onReportPlace} style={styles.reportButton}>
+          <Text style={styles.reportButtonText}>?μ냼 ?뺣낫 ?섏젙 ?쒕낫</Text>
+        </Pressable>
+      </View>
+    </ScrollView>
+    </View>
+  );
+}
+
+function buildReferenceComments(place: CuratedPlace): PlaceComment[] {
+  return (place.reviews ?? []).map((review, index) => ({
+    id: `${place.id}-reference-review-${index}`,
+    placeId: place.id,
+    memberName: review.nickname,
+    message: review.content,
+    createdAt: place.lastVerifiedAt ?? new Date().toISOString(),
+    rating: review.rating,
+    tags: review.tags,
+    visitType: review.visitStatus === "諛⑸Ц ?덉젙" ? "planned" : "visited",
+    helpfulCount: 0,
+    source: review.source
+  }));
+}
+
+function InfoItem({ title, value }: { title: string; value: string }) {
+  return (
+    <View style={styles.infoItem}>
+      <Text style={styles.infoTitle}>{title}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
+    </View>
+  );
+}
+
+function TrustMetric({ title, value }: { title: string; value: string }) {
+  return (
+    <View style={styles.trustMetric}>
+      <Text style={styles.trustMetricTitle}>{title}</Text>
+      <Text style={styles.trustMetricValue}>{value}</Text>
+    </View>
+  );
+}
+
+function RatingBreakdownRow({ label, count, percent }: { label: string; count: number; percent: number }) {
+  return (
+    <View style={styles.reviewBarRow}>
+      <View style={styles.reviewBarHeader}>
+        <Text style={styles.reviewBarLabel}>{label}</Text>
+        <Text style={styles.reviewBarCount}>{formatCount(count)}</Text>
+      </View>
+      <View style={styles.reviewTrack}>
+        <View style={[styles.reviewFill, { width: `${percent}%` }]} />
+      </View>
+    </View>
+  );
+}
+
+function RatingAspect({ label, score }: { label: string; score: number }) {
+  return (
+    <View style={styles.aspectItem}>
+      <View style={styles.aspectHeader}>
+        <Text style={styles.aspectLabel}>{label}</Text>
+        <Text style={styles.aspectScore}>{score.toFixed(1)}</Text>
+      </View>
+      <View style={styles.aspectTrack}>
+        <View style={[styles.aspectFill, { width: `${Math.min(100, score * 20)}%` }]} />
+      </View>
+    </View>
+  );
+}
+
+function PopularPhotoPreview({ place }: { place: CuratedPlace }) {
+  const imageUrls = getPlaceImageUrls(place, 10, 560);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const photoCount = getPlacePhotoCount(place);
+  const activePhotoIndex = Math.min(activeIndex, Math.max(0, imageUrls.length - 1));
+  const activePhotoUri = imageUrls[activePhotoIndex] ?? imageUrls[0] ?? "";
+
+  const movePhoto = (direction: -1 | 1) => {
+    if (imageUrls.length <= 1) return;
+    setActiveIndex((current) => (current + direction + imageUrls.length) % imageUrls.length);
+  };
+
+  if (imageUrls.length === 0) {
+    return (
+      <View style={[styles.popularPhotoWrap, styles.photoPendingBox]}>
+        <Text style={styles.photoPendingTextSmall}>?ъ쭊 以鍮꾩쨷</Text>
+      </View>
+    );
+  }
+
+  if (imageUrls.length === 1) {
+    return (
+      <View style={styles.popularPhotoWrap}>
+        <Image source={{ uri: imageUrls[0] }} style={styles.popularSingleImage} />
+        <PhotoCountBadge photoCount={photoCount} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.popularPhotoWrap}>
+      <Image source={{ uri: activePhotoUri }} style={styles.popularSingleImage} />
+      <Pressable
+        accessibilityLabel="?댁쟾 ?ъ쭊"
+        style={[styles.popularPhotoControl, styles.popularPhotoControlLeft]}
+        onPress={(event) => {
+          event.stopPropagation();
+          movePhoto(-1);
+        }}
+      >
+        <Text style={styles.popularPhotoArrowText}>??/Text>
+      </Pressable>
+      <Pressable
+        accessibilityLabel="?ㅼ쓬 ?ъ쭊"
+        style={[styles.popularPhotoControl, styles.popularPhotoControlRight]}
+        onPress={(event) => {
+          event.stopPropagation();
+          movePhoto(1);
+        }}
+      >
+        <Text style={styles.popularPhotoArrowText}>??/Text>
+      </Pressable>
+      <View style={styles.popularPhotoDots}>
+        {imageUrls.slice(0, 5).map((_, index) => (
+          <View
+            key={`${place.id}-photo-dot-${index}`}
+            style={[styles.popularPhotoDot, index === activePhotoIndex ? styles.popularPhotoDotActive : null]}
+          />
+        ))}
+      </View>
+      <PhotoCountBadge photoCount={photoCount} />
+    </View>
+  );
+}
+
+function PhotoCountBadge({ photoCount }: { photoCount: number }) {
+  if (photoCount <= 1) return null;
+
+  return (
+    <View style={styles.popularPhotoCountBadge}>
+      <Text style={styles.popularPhotoCountText}>{photoCount + "\uC7A5"}</Text>
+    </View>
+  );
+}
+
+function RatingLine({
+  place,
+  compact = false,
+  large = false,
+  reviewCount
+}: {
+  place: CuratedPlace;
+  compact?: boolean;
+  large?: boolean;
+  reviewCount?: number;
+}) {
+  return (
+    <View style={[styles.ratingLine, compact && styles.ratingLineCompact]}>
+      <Text style={[styles.ratingNumber, large && styles.ratingNumberLarge]}>{formatRating(place.rating)}</Text>
+      <RatingDots rating={place.rating ?? 4.6} small={compact} />
+      <Text style={[styles.ratingReviews, large && styles.ratingReviewsLarge]}>({getRatingReviewLabel(place, reviewCount)})</Text>
+    </View>
+  );
+}
+
+function RatingDots({ rating, small = false }: { rating: number; small?: boolean }) {
+  const full = Math.max(1, Math.min(5, Math.round(rating)));
+  return (
+    <View style={styles.dots}>
+      {Array.from({ length: 5 }).map((_, index) => (
+        <View key={index} style={[styles.dot, small && styles.dotSmall, index < full ? styles.dotFull : styles.dotEmpty]} />
+      ))}
+    </View>
+  );
+}
+
+function getPriceDisplay(place: CuratedPlace) {
+  if (place.priceDataSource || place.googlePriceLevel) {
+    return place.priceLevel;
+  }
+  return "媛寃⑸? ?뺣낫 ?놁쓬";
+}
+
+function getOpeningHoursLabel(place: CuratedPlace) {
+  const todayHours = getTodayOpeningText(place);
+  if (todayHours) {
+    return `${getOpeningStatusLabel(place)} 쨌 ${todayHours}`;
+  }
+  return "?곸뾽?쒓컙 ?뺣낫 ?놁쓬";
+}
+
+function getVerificationStatus(place: CuratedPlace, commentCount: number) {
+  if (commentCount > 0) {
+    return {
+      label: "?쒓뎅???꾧린 ?덉쓬",
+      copy: "?쒓뎅???ы뻾?먭? 吏곸젒 ?④릿 ?꾧린? ?꾩? 吏???뺣낫瑜??④퍡 蹂????덈뒗 ?μ냼?덉슂."
+    };
+  }
+  if (place.latestInfoSource || place.lastVerifiedAt) {
+    return {
+      label: "理쒓렐 ?뺣낫 ?뺤씤",
+      copy: "理쒓렐 ?뺤씤??湲곕낯 ?뺣낫? 諛⑸Ц ?곸쓣 ?쒓뎅?대줈 ?ㅼ떆 ?뺣━?덉뼱??"
+    };
+  }
+  if (getMangoReviewCount(place) > 0) {
+    return {
+      label: "留앷퀬留??꾧린 ?덉쓬",
+      copy: "???덉뿉 ?④꺼吏??쒓뎅???꾧린 湲곗??쇰줈 李멸퀬?????덈뒗 ?μ냼?덉슂."
+    };
+  }
+  return {
+    label: "?뺣낫 寃?좎쨷",
+    copy: "?쒓뎅???꾧린媛 ?꾩쭅 遺議깊빐?? 諛⑸Ц?덈떎硫?媛寃? 遺꾩쐞湲? ?묎렐???곸쓣 ?④꺼二쇱꽭??"
+  };
+}
+
+function getKoreanTravelerSummary(place: CuratedPlace, commentCount: number) {
+  const situations = getRecommendedSituations(place).slice(0, 3).join(" 쨌 ");
+  const contextCopy = getKoreanContextCopy(place);
+  const koreanTip = getPrimaryKoreanPoint(place);
+  return {
+    headline: getBestUseCase(place),
+    copy: `${contextCopy} ?뺤씤???μ냼 ?뺣낫? ?쒓뎅???꾧린瑜??④퍡 蹂닿퀬 寃곗젙?섎뒗 ?먮쫫??媛???덉쟾?댁슂.`,
+    points: [
+      { title: "異붿쿇 ?곹솴", value: situations || "諛⑸Ц ???뺤씤" },
+      { title: "?쒓뎅???ъ씤??, value: shortenText(koreanTip, 42) },
+      { title: "媛寃?媛먭컖", value: getPriceDisplay(place) },
+      { title: "寃利??곹깭", value: getVerificationStatus(place, commentCount).label }
+    ]
+  };
+}
+
+function getKoreanContextCopy(place: CuratedPlace) {
+  const area = place.area ?? place.city;
+  if (place.category === "留쏆쭛") {
+    return `${area}?먯꽌 ?앹궗 ?숈꽑???ｊ린 醫뗭? ?μ냼?덉슂. ?뺤씤???ъ쭊, ?곸뾽?뺣낫, ?쒓뎅???꾧린瑜?癒쇱? 蹂닿퀬 ?쇳겕 ?쒓컙? ?⑥씠?낃퉴吏 媛먯븞???吏곸씠硫?醫뗭븘??`;
+  }
+  if (place.category === "移댄럹") {
+    return `${area}?먯꽌 ?붿쐞瑜??쇳븯嫄곕굹 ?좉퉸 ?ш린 醫뗭? 移댄럹?덉슂. ?ъ쭊, 醫뚯꽍, ?뚯쓬 遺꾩쐞湲? ?묒뾽 媛???щ?瑜?媛숈씠 蹂대㈃ ?ㅽ뙣 ?뺣쪧????븘??`;
+  }
+  if (place.category === "留덉궗吏") {
+    return `${area}?먯꽌 ?쇱젙 以묎컙???쇰줈瑜??湲?醫뗭? 留덉궗吏 ?ㅽ뙚?댁뿉?? ?ㅼ젣 ?곸뾽?쒓컙, ?덉빟/?湲??щ?, 肄붿뒪 ?쒓컙??媛숈씠 蹂닿퀬 ?앹궗 ?꾪썑 ?숈꽑??遺숈씠硫??吏곸엫???명빐??`;
+  }
+  if (place.category === "諛?猷⑦봽??) {
+    return `${area}?먯꽌 ????댄썑 遺꾩쐞湲곗? ?쇨꼍??梨숆린湲?醫뗭? 怨녹씠?먯슂. ?쒕젅?ㅼ퐫?? 理쒖냼 二쇰Ц, ?쇱뒪?몄삤?붾? 媛숈씠 ?뺤씤?섎㈃ 醫뗭븘??`;
+  }
+  if (place.category === "媛?쇱삤耳") {
+    return `${area}?먯꽌 ?쇳뻾怨???? ?쒓컙源뚯? ?댁뼱媛湲?醫뗭? 怨녹씠?먯슂. 猷?媛寃? ?몄썝 湲곗?, 異붽? ?붽툑 ?щ?瑜?癒쇱? ?뺤씤?섎뒗 ?몄씠 ?덉쟾?댁슂.`;
+  }
+  return `${area}?먯꽌 ?ы뻾 ?숈꽑 以묎컙???ｊ린 醫뗭? ?μ냼?덉슂. 諛⑸Ц 紐⑹쟻, ?대룞 ?쒓컙, ?ㅼ젣 ?댁쁺 ?щ?瑜??④퍡 ?뺤씤?섎㈃ ?쇱젙 ?꾩꽦?꾧? ?щ씪媛??`;
+}
+
+function getVisitCheckItems(place: CuratedPlace) {
+  return [
+    { title: "?곸뾽?쒓컙", value: getTodayOpeningText(place) ? `${getOpeningStatusLabel(place)} 쨌 ${getTodayOpeningText(place)}` : "?곸뾽?쒓컙 ?뺣낫 ?놁쓬" },
+    { title: "媛寃⑸?", value: getPriceDisplay(place) },
+    { title: "?곕씫泥?, value: getContactDisplay(place) },
+    { title: "二쇱쓽 ?ъ씤??, value: getCategoryCaution(place) },
+    { title: "?낅뜲?댄듃", value: `${getRecentUpdateDate(place)} 쨌 ?뺣낫 ?섏젙 ?쒕낫 媛?? }
+  ];
+}
+
+function getBestUseCase(place: CuratedPlace) {
+  if (place.category === "移댄럹") return "?붿슫 ?ㅽ썑???ш굅???ъ쭊 ?④린湲?醫뗭? 怨?;
+  if (place.category === "留덉궗吏") return "?앹궗 ?꾪썑 ?쇰줈 ?湲?醫뗭? 留덉궗吏 ?ㅽ뙚";
+  if (place.category === "諛?猷⑦봽??) return "????댄썑 遺꾩쐞湲곗? ?쇨꼍??梨숆린湲?醫뗭? 怨?;
+  if (place.category === "媛?쇱삤耳") return "?쇳뻾怨???? ?쒓컙源뚯? ?댁뼱媛湲?醫뗭? 怨?;
+  if (place.category === "?섏쟾") return "?숈꽑 以??섏쑉??鍮꾧탳?대낫湲?醫뗭? 怨?;
+  if (place.category === "?쇳븨") return "?ы뻾 以??꾩슂??臾쇨굔??李얘린 醫뗭? 怨?;
+  if (place.category === "?ъ쭊紐낆냼") return "吏㏐쾶 ?ㅻ윭 ?ъ쭊 ?④린湲?醫뗭? 怨?;
+  return "?앹궗 ?숈꽑???ｊ린 醫뗭? ?쒓뎅??異붿쿇 ?μ냼";
+}
+
+function getCategoryCaution(place: CuratedPlace) {
+  if (place.category === "留덉궗吏") return "?덉빟 媛???щ?, 肄붿뒪 ?쒓컙, ???ы븿 ?щ? ?뺤씤";
+  if (place.category === "諛?猷⑦봽??) return "?쒕젅?ㅼ퐫?? 理쒖냼 二쇰Ц, ?쇱뒪?몄삤???뺤씤";
+  if (place.category === "媛?쇱삤耳") return "猷?媛寃? ?몄썝 湲곗?, 異붽? ?붽툑 ?뺤씤";
+  if (place.category === "?섏쟾") return "?ш텒 ?꾩슂 ?щ?? ?ㅼ젣 ?곸슜 ?섏쑉 ?뺤씤";
+  if (place.category === "?쇳븨") return "?뺤같???щ?? 援먰솚/?섎텋 媛???щ? ?뺤씤";
+  if (place.category === "?ъ쭊紐낆냼") return "?쇱옟 ?쒓컙怨?珥ъ쁺 ?쒗븳 ?щ? ?뺤씤";
+  if (place.category === "移댄럹") return "肄섏꽱?? 醫뚯꽍, ?뚯쓬 遺꾩쐞湲??뺤씤";
+  return "?⑥씠?? 移대뱶 寃곗젣, ???硫붾돱瑜?癒쇱? ?뺤씤";
+}
+
+function shortenText(value: string, maxLength: number) {
+  return value.length > maxLength ? value.slice(0, Math.max(0, maxLength - 3)) + "..." : value;
+}
+
+function getRecommendedSituations(place: CuratedPlace) {
+  const category = normalizeCategory(place);
+  const candidates = [
+    place.beginnerSafe ? "\uCCAB \uBC29\uBB38" : "\uD604\uC9C0 \uAC10\uC131",
+    place.rainyDayOk ? "\uBE44 \uC624\uB294 \uB0A0" : "\uB0A0\uC528 \uC88B\uC744 \uB54C",
+    ...place.bestTime.map((time) => (time.includes("\uBC24") || time.includes("\uC57C") ? "\uC57C\uC2DD" : time.includes("\uC800\uB141") ? "\uB370\uC774\uD2B8" : "\uD63C\uBC25")),
+    ...place.tags.slice(0, 4),
+    category === "cafe" ? "\uC791\uC5C5/\uD734\uC2DD" : category === "massage" ? "\uD53C\uB85C \uD68C\uBCF5" : category === "night" ? "2\uCC28" : "\uAC00\uC871"
+  ];
+  return Array.from(new Set(candidates.filter(Boolean))).slice(0, 7);
+}
+
+function getTrustScore(place: CuratedPlace) {
+  const rating = place.rating ?? 4.5;
+  const reviewVolume = Math.min(12, getMangoReviewCount(place) * 2);
+  const koreanContextBonus = getDisplayKoreanTip(place) || place.koreanReviewSignal?.summary ? 8 : 2;
+  return Math.min(96, Math.round(rating * 16 + reviewVolume + koreanContextBonus));
+}
+
+function getTrustCopy(place: CuratedPlace) {
+  if (place.koreanReviewSignal?.reviewCount) return "\uD55C\uAD6D\uC778 \uD6C4\uAE30 \uD655\uC778";
+  if (place.latestInfoSource || place.lastVerifiedAt) return "理쒓렐 ?뺣낫 ?뺤씤";
+  if (place.googleMapsUri) return "吏???곌껐 媛??;
+  return "\uC815\uBCF4 \uAC80\uD1A0\uC911";
+}
+
+function getRecentUpdateDate(place: CuratedPlace) {
+  if (place.lastVerifiedAt) {
+    const date = new Date(place.lastVerifiedAt);
+    if (!Number.isNaN(date.getTime())) {
+      return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")} ?뺤씤`;
+    }
+  }
+  return "2026.06 \uD655\uC778";
+}
+
+function formatRealCommentCount(count: number) {
+  return count > 0 ? count + "\uAC1C" : "\uCCAB \uD6C4\uAE30 \uB300\uAE30";
+}
+
+function getReviewBasisLabel(count: number) {
+  return count > 0 ? `망고맵 후기 ${count}개 기준` : "망고맵 후기 대기";
+}
+
+function getRatingReviewLabel(place: CuratedPlace, overrideCount?: number) {
+  const count = overrideCount ?? getMangoReviewCount(place);
+  return count > 0 ? `후기 ${count}개` : "후기 대기";
+}
+
+function getDisplayRatingFromComments(place: CuratedPlace, reviewComments: PlaceComment[]) {
+  const ratings = reviewComments
+    .map((comment) => comment.rating)
+    .filter((rating): rating is number => typeof rating === "number" && rating >= 1 && rating <= 5);
+  if (ratings.length === 0) return place.rating ?? 4.6;
+  return ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
+}
+
+function getRatingBreakdown(reviewComments: PlaceComment[]) {
+  const buckets = [
+    { label: "\uD6CC\uB96D\uD568", score: 5, count: 0 },
+    { label: "\uC88B\uC74C", score: 4, count: 0 },
+    { label: "\uBCF4\uD1B5", score: 3, count: 0 },
+    { label: "\uC544\uC26C\uC6C0", score: 2, count: 0 },
+    { label: "\uBE44\uCD94\uCC9C", score: 1, count: 0 }
+  ];
+
+  reviewComments.forEach((comment) => {
+    if (typeof comment.rating !== "number") return;
+    const normalizedRating = Math.max(1, Math.min(5, Math.round(comment.rating)));
+    const bucket = buckets.find((row) => row.score === normalizedRating);
+    if (bucket) bucket.count += 1;
+  });
+
+  const total = buckets.reduce((sum, row) => sum + row.count, 0);
+  if (total === 0) {
+    return buckets.map((row) => ({
+      label: row.label,
+      count: 0,
+      percent: 0
+    }));
+  }
+
+  return buckets.map((row) => ({
+    label: row.label,
+    count: row.count,
+    percent: row.count > 0 ? Math.max(5, Math.round((row.count / total) * 100)) : 0
+  }));
+}
+function getAspectScores(place: CuratedPlace) {
+  const base = place.rating ?? 4.6;
+  return [
+    { label: "\uC74C\uC2DD/\uC11C\uBE44\uC2A4", score: Math.min(5, base + 0.1) },
+    { label: "\uBD84\uC704\uAE30", score: Math.min(5, base + (place.hiddenGem ? 0.2 : 0)) },
+    { label: "\uC811\uADFC\uC131", score: Math.max(3.8, base - 0.2) },
+    { label: "\uD55C\uAD6D\uC778 \uB9CC\uC871", score: Math.min(5, base + 0.15) }
+  ];
+}
+
+function formatCommentDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "\uCD5C\uADFC";
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.max(1, Math.floor(diffMs / 60000));
+  if (diffMinutes < 60) return diffMinutes + "\uBD84 \uC804";
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return diffHours + "\uC2DC\uAC04 \uC804";
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 30) return diffDays + "\uC77C \uC804";
+  return (date.getMonth() + 1) + "\uC6D4 " + date.getDate() + "\uC77C";
+}
+
+function sharePlace(place: CuratedPlace) {
+  const text = "MANGOMAP \uD55C\uAD6D\uC778 \uAC80\uC99D \uC7A5\uC18C\n" + place.name + "\n" + getPlaceDetailLead(place) + "\n" + place.googleMapsUri;
+  const nav = typeof navigator !== "undefined" ? (navigator as Navigator & { share?: (data: { title?: string; text?: string; url?: string }) => Promise<void>; clipboard?: Clipboard }) : undefined;
+  if (nav?.share) {
+    nav.share({ title: place.name, text, url: place.googleMapsUri }).catch(() => undefined);
+    return;
+  }
+  if (nav?.clipboard) {
+    nav.clipboard.writeText(text).catch(() => undefined);
+  }
+}
+
+
+function getGooglePhotoMediaUrl(photoName?: string, maxWidth = 720) {
+  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (apiKey && photoName) {
+    return `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${maxWidth}&key=${apiKey}`;
+  }
+  return "";
+}
+
+function getPlaceImageUrl(place: CuratedPlace) {
+  return getGooglePhotoMediaUrl(getPlacePhotoNames(place)[0]);
+}
+
+function getPlaceImageUrls(place: CuratedPlace, limit = 10, maxWidth = 900) {
+  const googlePhotos = getPlacePhotoNames(place)
+    .map((photoName) => getGooglePhotoMediaUrl(photoName, maxWidth))
+    .filter(Boolean);
+  return Array.from(new Set(googlePhotos)).slice(0, limit);
+}
+
+function getPlacePhotoNames(place: CuratedPlace) {
+  return Array.from(new Set([...(place.photoNames ?? []), place.photoName].filter(Boolean) as string[]));
+}
+
+function buildPlaceLongIntro(place: CuratedPlace, comments: PlaceComment[] = []) {
+  const structuredSections = getStructuredIntroSections(place);
+  if (structuredSections.length > 0) {
+    return structuredSections;
+  }
+
+  const area = place.area ?? place.city;
+  const tags = place.tags.slice(0, 4).join(" 쨌 ");
+  const lead = getPlaceDetailLead(place);
+  const currentHours = getTodayOpeningText(place);
+  const contact = getContactDisplay(place);
+  const photoCount = getPlacePhotoCount(place);
+  const koreanTip = getDisplayKoreanTip(place);
+  const commentInsight = getCommentInsightCopy(comments);
+  const verifiedParts = [
+    getMangoReviewCount(place) ? `留앷퀬留??꾧린 ${getMangoReviewCount(place)}媛? : "",
+    place.address ? "二쇱냼" : "",
+    currentHours ? "?댁쁺 ?뺣낫" : "",
+    photoCount > 0 ? `?ъ쭊 ${photoCount}?? : ""
+  ].filter(Boolean);
+  const hoursCopy = currentHours ? `?ㅻ뒛 ?뺤씤 媛?ν븳 ?댁쁺 ?쒓컙? ${currentHours}濡??쒖떆?쇱슂.` : "";
+  const contactCopy = contact !== "?꾪솕踰덊샇 ?뺣낫 ?놁쓬" ? `臾몄쓽媛 ?꾩슂?섎㈃ ${contact}濡??뺤씤?????덉뼱??` : "";
+  const detailBasisCopy = verifiedParts.length > 0
+    ? `留앷퀬留듭? ${verifiedParts.join(", ")}瑜?諛뷀깢?쇰줈 諛⑸Ц ?먮떒???꾩슂???ъ씤?몃쭔 ?뺣━?덉뼱??`
+    : "留앷퀬留듭? ?ㅼ젣 ?뺤씤???뺣낫媛 ?볦씠???쒖꽌?濡??μ냼 ?댁슜???낅뜲?댄듃?섍퀬 ?덉뼱??";
+
+  return [
+    lead,
+    `${area} 洹쇱쿂?먯꽌 ?숈꽑???ｊ린 醫뗭? ?μ냼?덉슂. ????ъ쭊怨?由щ럭 ?먮쫫??癒쇱? 蹂닿퀬, ?쇳겕 ?쒓컙??먮뒗 ?湲?媛?μ꽦源뚯? 媛먯븞?댁꽌 ?吏곸씠硫?醫뗭븘??`,
+    [detailBasisCopy, hoursCopy].filter(Boolean).join(" "),
+    `${commentInsight} ${tags ? `諛⑸Ц 紐⑹쟻蹂꾨줈??${tags} ?ъ씤?몃? 媛숈씠 蹂대㈃ ?좏깮???ъ썙??` : "?대룞 ?몄쓽? ?ㅼ젣 遺꾩쐞湲곕? 媛숈씠 蹂대㈃ ?좏깮???ъ썙??"}`,
+    [koreanTip, place.websiteUri ? "?뱀궗?댄듃媛 ?덈뒗 ?μ냼??怨듭?? ?댁쁺 蹂?숈쓣 ?④퍡 ?뺤씤?섎㈃ 醫뗭븘??" : "", contactCopy].filter(Boolean).join(" ")
+  ].filter((paragraph) => paragraph.trim().length > 0);
+}
+
+function getCommentInsightCopy(comments: PlaceComment[]) {
+  if (comments.length === 0) {
+    return "?꾩쭅 ?쒓뎅???꾧린媛 留롮????딆?留? ?꾩튂? ?ъ쭊??癒쇱? 蹂닿퀬 ?쇱젙???ｌ쓣吏 ?먮떒?섎㈃ 醫뗭븘??";
+  }
+
+  const text = comments.map((comment) => `${comment.message} ${(comment.tags ?? []).join(" ")}`).join(" ");
+  const signals = [
+    { keys: ["?쇰갈", "遺??, "?쇱옄"], copy: "?꾧린 ?먮쫫???쇱옄 ?ㅻⅤ湲곗뿉??遺?댁씠 ?곷떎??諛섏쓳??蹂댁뿬??" },
+    { keys: ["媛?깅퉬", "媛寃?, "??, "???], copy: "媛寃⑷낵 ?묒쓣 媛숈씠 遊ㅼ쓣 ??留뚯”?덈떎??諛섏쓳???욎뿬 ?덉뼱??" },
+    { keys: ["?곗씠??, "遺꾩쐞湲?, "?쇨꼍", "?ъ쭊"], copy: "遺꾩쐞湲곕굹 ?ъ쭊??湲곕??섍퀬 媛???ы뻾?먯뿉寃???留욌뒗 ?몄씠?먯슂." },
+    { keys: ["媛議?, "?꾩씠", "遺紐?], copy: "媛議??⑥쐞濡??吏곸씪 ?뚮룄 鍮꾧탳?대낵 留뚰븳 ?μ냼濡?蹂댁뿬??" },
+    { keys: ["?湲?, "遺?, "?⑥씠??, "?쇳겕"], copy: "?앹궗 ?쒓컙????쇳겕 ?쒓컙?먮뒗 議곌툑 遺먮퉴 ???덈떎???먯? 媛먯븞?섎뒗 寃?醫뗭븘??" },
+    { keys: ["移쒖젅", "?쒕퉬??, "?묐?"], copy: "吏곸썝 ?묐?? ?쒕퉬?ㅼ뿉 ???湲띿젙?곸씤 諛섏쓳??蹂댁뿬??" },
+    { keys: ["留ㅼ슫", "?μ떊猷?, "留?], copy: "留쏆? ?꾨컲?곸쑝濡?留뚯”?ㅻ읇吏留?留ㅼ슫留쏆씠???μ떊猷뚮뒗 痍⑦뼢???곕씪 媛덈┫ ???덉뼱??" }
+  ];
+
+  const matched = signals.find((signal) => signal.keys.some((key) => text.includes(key)));
+  if (matched) return matched.copy;
+
+  const firstUsefulComment = comments.find((comment) => comment.message.length > 12);
+  if (firstUsefulComment) {
+    return `${shortenText(firstUsefulComment.message, 64)} ?대윴 ?꾧린 ?먮쫫??李멸퀬?댁꽌 諛⑸Ц ?щ?瑜?寃곗젙?섎㈃ 醫뗭븘??`;
+  }
+
+  return "吏㏃? ?꾧린?ㅼ씠 ?볦씠怨??덉뼱 諛⑸Ц ??遺꾩쐞湲곕? 媛蹂띻쾶 ?뺤씤?섍린 醫뗭븘??";
+}
+
+function getDisplayKoreanTip(place: CuratedPlace) {
+  const rawTip = place.koreanTip || place.koreanReviewSignal?.summary || "";
+  const cleaned = rawTip
+    .replace(/\s*?꾨낫\s*/g, " ")
+    .replace(/Google 由щ럭[^.\n]*\.?/g, "")
+    .replace(/?쇳겕 ?쒓컙, 硫붾돱 ?ъ쭊, 理쒓렐 ?곸뾽?쒓컙? Google Maps?먯꽌 ??踰??뺤씤?섏꽭??.?/g, "?쇳겕 ?쒓컙??먮뒗 ?湲??щ?瑜??뺤씤?섎㈃ 醫뗭븘??")
+    .replace(/理쒓렐 ?곸뾽?쒓컙? Google Maps?먯꽌 ??踰??뺤씤?섏꽭??.?/g, "?뺤씤???곸뾽?쒓컙 ?곗씠?곌? ?놁쑝硫?諛⑸Ц ???뺤씤???꾩슂?댁슂.")
+    .replace(/Google Maps?먯꽌 ??踰??뺤씤?섏꽭??.?/g, "")
+    .replace(/Google Places 湲곗??쇰줈 異붽???s*/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return cleaned || "諛⑸Ц ?꾩뿉 李멸퀬??留뚰븳 ?곸? ?꾩쭅 ?뺣━ 以묒씠?먯슂.";
+}
+
+function getStructuredIntroSections(place: CuratedPlace) {
+  const tip = getDisplayKoreanTip(place);
+  if (!tip.includes("?쒖쨪?붿빟") || !tip.includes("異붿쿇 ?댁쑀") || !tip.includes("諛⑸Ц ??)) {
+    return [];
+  }
+  return tip.split(/\n{2,}/).map((section) => section.trim()).filter(Boolean);
+}
+
+function getPrimaryKoreanPoint(place: CuratedPlace) {
+  const tip = getDisplayKoreanTip(place);
+  const visitTip = tip.match(/諛⑸Ц ??s*\n-\s*([^\n]+)/);
+  if (visitTip?.[1]) return visitTip[1];
+  const reason = tip.match(/異붿쿇 ?댁쑀\s*\n-\s*([^\n]+)/);
+  if (reason?.[1]) return reason[1];
+  const summary = tip.match(/?쒖쨪?붿빟\s*\n([^\n]+)/);
+  if (summary?.[1]) return summary[1];
+  return tip;
+}
+
+function getPlaceDetailLead(place: CuratedPlace) {
+  const normalizedLine = place.oneLine.replace(/\s*?꾨낫\s*/g, " ").replace(/\s+/g, " ").trim();
+  if (normalizedLine) return normalizedLine;
+  if (place.category === "留쏆쭛") return "?앹궗 ?숈꽑???ｊ린 醫뗭? 留쏆쭛?낅땲??";
+  if (place.category === "移댄럹") return "?붿슫 ?ㅽ썑???ш굅???ъ쭊 ?④린湲?醫뗭? 移댄럹?낅땲??";
+  if (place.category === "留덉궗吏") return "留롮씠 嫄몄? ??而⑤뵒???뚮났?⑹쑝濡??ｊ린 醫뗭? 留덉궗吏 ?ㅽ뙚?낅땲??";
+  if (place.category === "諛?猷⑦봽??) return "????댄썑 遺꾩쐞湲곗? ?쇨꼍??梨숆린湲?醫뗭? 猷⑦봽??諛붿엯?덈떎.";
+  if (place.category === "媛?쇱삤耳") return "?쇳뻾怨???? ?쒓컙源뚯? ?댁뼱媛湲?醫뗭? 媛?쇱삤耳?낅땲??";
+  return "?ы뻾 ?숈꽑 以묎컙???ｊ린 醫뗭? ?쒓뎅??異붿쿇 ?μ냼?낅땲??";
+}
+
+function getPlacePhotoCount(place: CuratedPlace) {
+  return getPlacePhotoNames(place).length;
+}
+
+function buildPlaceFeatures(place: CuratedPlace) {
+  const openTime = getTodayOpeningText(place)
+    ? `${getOpeningStatusLabel(place)} 쨌 ${getTodayOpeningText(place)}`
+    : "?곸뾽?쒓컙 ?뺣낫 ?놁쓬";
+  return [
+    {
+      icon: "??,
+      title: "異붿쿇 ?쒓컙",
+      copy: openTime
+    },
+    {
+      icon: "??,
+      title: "?꾩튂",
+      copy: `${place.area ?? place.city}${place.address ? ` 쨌 ${place.address}` : ""}`
+    },
+    {
+      icon: "??,
+      title: "?뱀쭠",
+      copy: place.tags.slice(0, 5).join(" 쨌 ") || place.category
+    },
+    {
+      icon: "??,
+      title: "臾몄쓽",
+      copy: place.websiteUri ? `${getContactDisplay(place)} 쨌 ?뱀궗?댄듃 ?덉쓬` : getContactDisplay(place)
+    }
+  ];
+}
+
+function getTodayOpeningText(place: CuratedPlace) {
+  const rows = place.openingHoursText ?? [];
+  if (rows.length === 0) return "";
+  const dayIndex = new Date().getDay();
+  const koreanDays = ["?쇱슂??, "?붿슂??, "?붿슂??, "?섏슂??, "紐⑹슂??, "湲덉슂??, "?좎슂??];
+  const today = koreanDays[dayIndex];
+  const matched = rows.find((row) => row.startsWith(today + ":"));
+  const value = matched ?? rows[0];
+  return value.replace(/^[^:]+:\s*/, "").trim();
+}
+
+function getOpeningStatusLabel(place: CuratedPlace) {
+  if (place.businessStatus === "CLOSED_PERMANENTLY") return "?먯뾽 ?쒖떆";
+  if (place.businessStatus === "CLOSED_TEMPORARILY") return "?꾩떆 ?댁뾽";
+  if (typeof place.openNow === "boolean") return place.openNow ? "?곸뾽 以? : "?곸뾽 醫낅즺";
+  return "?곸뾽?쒓컙";
+}
+
+function getContactDisplay(place: CuratedPlace) {
+  return place.nationalPhoneNumber || place.internationalPhoneNumber || "?꾪솕踰덊샇 ?뺣낫 ?놁쓬";
+}
+
+function normalizeCategory(place: CuratedPlace) {
+  if (place.category === "移댄럹") return "cafe";
+  if (place.category === "留덉궗吏") return "massage";
+  if (place.category === "諛?猷⑦봽?? || place.category === "媛?쇱삤耳") return "night";
+  if (place.category === "?쇳븨") return "shopping";
+  if (place.category === "?ъ쭊紐낆냼" || place.category === "?ъ뼱/?≫떚鍮꾪떚") return "photo";
+  return "food";
+}
+
+function scorePlace(place: CuratedPlace) {
+  return (place.rating ?? 4.3) * 100 + (place.userRatingCount ?? 0) / 100 + (place.koreanReviewSignal?.score ?? 0) * 20;
+}
+
+function buildMeta(place: CuratedPlace) {
+  const price = place.priceDataSource || place.googlePriceLevel
+    ? place.priceLevel === "??? ? "$" : place.priceLevel === "?꾨━誘몄뾼" ? "$$$" : "$$"
+    : "";
+  const category = place.category === "留쏆쭛" ? "?뚯떇?? : place.category;
+  const area = place.area ?? place.city;
+  return [price, category, ...place.tags.slice(0, 2), area].filter(Boolean).join(" 쨌 ");
+}
+
+function hasTag(place: CuratedPlace, tags: string[]) {
+  return place.tags.some((tag) => tags.some((keyword) => tag.toLowerCase().includes(keyword.toLowerCase())));
+}
+
+function nameHas(place: CuratedPlace, keywords: string[]) {
+  const name = place.name.toLowerCase();
+  return keywords.some((keyword) => name.includes(keyword.toLowerCase()));
+}
+
+function normalizeFilterId(value?: string): FilterId {
+  return filters.some((filter) => filter.id === value) ? (value as FilterId) : "all";
+}
+
+function getFilterIcon(filterId: FilterId) {
+  const icons: Record<FilterId, string> = {
+    all: "??,
+    food: "?뜙",
+    cafe: "??,
+    massage: "?뭷",
+    rooftop: "?뜽",
+    karaoke: "?렎",
+    shopping: "?썚",
+    photo: "?벜",
+    exchange: "?뮦",
+    korean: "??,
+    chinese: "以?,
+    japanese: "??,
+    vietnamese: "VN"
+  };
+  return icons[filterId];
+}
+
+function formatRating(value?: number) {
+  return (value ?? 4.6).toFixed(1);
+}
+
+function formatCount(value: number) {
+  if (value >= 10000) return `${Math.floor(value / 1000) / 10}留?`;
+  if (value >= 1000) return `${Math.floor(value).toLocaleString()}`;
+  return `${value}`;
+}
+
+function loadComments(): PlaceComment[] {
+  if (typeof localStorage === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(placeCommunityStorageKey);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveComments(comments: PlaceComment[]) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(placeCommunityStorageKey, JSON.stringify(comments.slice(0, 200)));
+  } catch {
+    // ?볤? ????ㅽ뙣???먯깋 ?ъ슜??留됱? ?딅뒗??
+  }
+}
+
+const styles = StyleSheet.create({
+  searchPanel: {
+    backgroundColor: colors.surface,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "#FFE1A6",
+    padding: 18,
+    gap: 16,
+    ...shadow
+  },
+  searchBox: {
+    minHeight: 62,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#F4D894",
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 18,
+    gap: 10
+  },
+  searchIcon: { fontSize: 28, color: colors.muted, fontWeight: "900" },
+  searchInput: { flex: 1, fontSize: 18, color: colors.ink, fontWeight: "900" },
+  cityTabs: { gap: 10, paddingRight: 16 },
+  cityPill: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#E8D7A8",
+    backgroundColor: "#FFF9E8"
+  },
+  cityPillActive: { backgroundColor: colors.cyan },
+  cityPillText: { color: colors.muted, fontSize: 15, fontWeight: "900" },
+  cityPillTextActive: { color: "#271400" },
+  filterTabs: { gap: 14, paddingRight: 16 },
+  filterPill: { alignItems: "center", gap: 7, minWidth: 70 },
+  filterPillActive: {},
+  filterIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    textAlign: "center",
+    lineHeight: 58,
+    overflow: "hidden",
+    backgroundColor: "#FFF2CE",
+    borderWidth: 1,
+    borderColor: "#FFD67D",
+    fontSize: 25
+  },
+  filterText: { color: colors.muted, fontSize: 13, fontWeight: "900" },
+  filterTextActive: { color: "#1F2937" },
+  topFilterBar: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 18,
+    marginBottom: 4,
+    overflow: "hidden"
+  },
+  outlineButton: {
+    borderWidth: 1,
+    borderColor: "#1C5A3B",
+    paddingHorizontal: 15,
+    paddingVertical: 11,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF"
+  },
+  outlineButtonWide: {
+    borderWidth: 1,
+    borderColor: "#1C5A3B",
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF"
+  },
+  outlineButtonText: { color: "#0B3D27", fontSize: 15, fontWeight: "900" },
+  sectionBlock: {
+    marginTop: 28
+  },
+  sectionTitle: { color: colors.ink, fontSize: 30, fontWeight: "900", letterSpacing: 0 },
+  sectionCopy: { color: colors.muted, fontSize: 18, lineHeight: 28, marginTop: 8, fontWeight: "800" },
+  carouselTrack: { gap: 22, paddingVertical: 18, paddingRight: 28 },
+  heroCard: { width: 250 },
+  heroImage: { width: "100%", height: 290, justifyContent: "space-between", padding: 12 },
+  heroImageRadius: { borderRadius: 18 },
+  photoPendingBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF8E6",
+    borderWidth: 1,
+    borderColor: "#F0D89A"
+  },
+  photoPendingText: { color: "#063F28", fontSize: 18, fontWeight: "900" },
+  photoPendingSubtext: { color: colors.muted, fontSize: 13, fontWeight: "800", marginTop: 6 },
+  photoPendingTextSmall: { color: "#063F28", fontSize: 12, fontWeight: "900", textAlign: "center" },
+  saveBubble: {
+    alignSelf: "flex-end",
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  saveBubbleText: { color: "#063F28", fontSize: 32, fontWeight: "900" },
+  awardBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.cyan,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8
+  },
+  awardBadgeText: { color: "#271400", fontSize: 13, fontWeight: "900" },
+  guideBadge: {
+    color: "#D43F53",
+    backgroundColor: "#FFF1F3",
+    alignSelf: "flex-start",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginTop: 13,
+    overflow: "hidden",
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  heroTitle: { color: colors.ink, fontSize: 24, lineHeight: 30, marginTop: 8, fontWeight: "900" },
+  ratingLine: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 7 },
+  ratingLineCompact: { marginTop: 4 },
+  ratingNumber: { color: "#063F28", fontSize: 18, fontWeight: "900" },
+  ratingNumberLarge: { fontSize: 22 },
+  ratingReviews: { color: "#063F28", fontSize: 16, fontWeight: "800" },
+  ratingReviewsLarge: { fontSize: 18 },
+  dots: { flexDirection: "row", gap: 3, alignItems: "center" },
+  dot: { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: "#009A44" },
+  dotSmall: { width: 11, height: 11, borderRadius: 6 },
+  dotFull: { backgroundColor: "#009A44" },
+  dotEmpty: { backgroundColor: "#FFFFFF" },
+  heroMeta: { color: colors.ink, fontSize: 17, lineHeight: 25, marginTop: 7, fontWeight: "700" },
+  popularList: { gap: 22, marginTop: 18 },
+  popularRow: { flexDirection: "row", gap: 16, minHeight: 168, position: "relative" },
+  popularPhotoWrap: { width: 156, height: 168, borderRadius: 16, backgroundColor: "#F3F4F6", overflow: "hidden", position: "relative" },
+  popularSingleImage: { width: "100%", height: "100%" },
+  popularPhotoControl: {
+    position: "absolute",
+    top: 67,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(6, 63, 40, 0.82)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.86)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  popularPhotoControlLeft: { left: 8 },
+  popularPhotoControlRight: { right: 8 },
+  popularPhotoArrowText: { color: "#FFFFFF", fontSize: 26, lineHeight: 28, fontWeight: "900" },
+  popularPhotoDots: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 10,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 5
+  },
+  popularPhotoDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255, 255, 255, 0.58)" },
+  popularPhotoDotActive: { width: 16, backgroundColor: "#FFFFFF" },
+  popularPhotoCountBadge: {
+    position: "absolute",
+    right: 7,
+    bottom: 7,
+    backgroundColor: "rgba(6, 63, 40, 0.9)",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5
+  },
+  popularPhotoCountText: { color: "#FFFFFF", fontSize: 12, fontWeight: "900" },
+  popularBody: { flex: 1, paddingRight: 28 },
+  guideBadgeSmall: { color: "#D43F53", fontSize: 13, fontWeight: "900", marginBottom: 4 },
+  popularTitle: { color: colors.ink, fontSize: 23, lineHeight: 29, fontWeight: "900" },
+  popularMeta: { color: colors.ink, fontSize: 16, lineHeight: 24, marginTop: 5, fontWeight: "700" },
+  rowSaveButton: {
+    position: "absolute",
+    left: 110,
+    top: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF"
+  },
+  rowSaveText: { color: "#063F28", fontSize: 25, fontWeight: "900" },
+  allButton: {
+    minHeight: 68,
+    borderRadius: 34,
+    borderWidth: 1.5,
+    borderColor: "#063F28",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 26,
+    backgroundColor: "#FFFFFF"
+  },
+  allButtonText: { color: "#063F28", fontSize: 20, fontWeight: "900" },
+  insightHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 },
+  insightTitleBox: { flex: 1 },
+  insightHelp: { marginTop: 6, color: colors.muted, fontSize: 14, fontWeight: "800", lineHeight: 21 },
+  insightCount: {
+    color: "#8A5B00",
+    fontSize: 13,
+    fontWeight: "900",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: "#FFF3C4",
+    overflow: "hidden"
+  },
+  insightCard: {
+    marginTop: 14,
+    borderRadius: 24,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#F0D89A",
+    padding: 18,
+    gap: 16
+  },
+  insightScorePanel: {
+    borderRadius: 20,
+    backgroundColor: "#FFF8DC",
+    borderWidth: 1,
+    borderColor: "#F3D77B",
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  insightScoreLabel: { color: "#8A5B00", fontSize: 13, fontWeight: "900" },
+  insightScore: { color: "#063F28", fontSize: 44, fontWeight: "900", letterSpacing: 0 },
+  insightScoreCaption: { color: colors.muted, fontSize: 13, fontWeight: "900" },
+  insightBars: { gap: 14 },
+  insightBarRow: { gap: 6 },
+  insightBarTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 },
+  insightBarLabel: { color: colors.ink, fontSize: 14, fontWeight: "900" },
+  insightBarValue: { color: "#063F28", fontSize: 13, fontWeight: "900" },
+  insightBarHint: { color: colors.muted, fontSize: 12, fontWeight: "800" },
+  insightTrack: { height: 10, borderRadius: 999, backgroundColor: "#E5E7EB", overflow: "hidden" },
+  insightFill: { height: "100%", borderRadius: 999, backgroundColor: "#009A44" },
+  insightMapButton: {
+    minHeight: 58,
+    borderRadius: 29,
+    backgroundColor: "#063F28",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 16,
+    ...shadow
+  },
+  insightMapButtonText: { color: "#FFFFFF", fontSize: 18, fontWeight: "900" },
+  detailPage: { flex: 1, backgroundColor: "#FFFFFF" },
+  detailBodyScroll: { flex: 1, backgroundColor: "#FFFFFF" },
+  detailContent: { paddingBottom: 120 },
+  detailTopBar: {
+    minHeight: 64,
+    paddingHorizontal: 18,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center"
+  },
+  backButton: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
+  backButtonText: { color: "#063F28", fontSize: 44, fontWeight: "700" },
+  detailActions: { flexDirection: "row", gap: 8 },
+  detailIconButton: { minWidth: 58, height: 42, borderRadius: 21, paddingHorizontal: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#F3F8F1" },
+  detailIconText: { color: "#063F28", fontSize: 14, fontWeight: "900" },
+  detailTabs: {
+    minHeight: 58,
+    paddingHorizontal: 24,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 30,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+    zIndex: 10
+  },
+  detailTabButton: { paddingTop: 12 },
+  detailTab: { color: "#063F28", fontSize: 20, fontWeight: "900", paddingBottom: 14, opacity: 0.58 },
+  detailTabActive: {
+    color: "#063F28",
+    fontSize: 20,
+    fontWeight: "900",
+    paddingBottom: 12,
+    borderBottomWidth: 4,
+    borderBottomColor: "#063F28",
+    opacity: 1
+  },
+  detailPhotoStage: { position: "relative", backgroundColor: "#F3F4F6", paddingVertical: 14 },
+  detailPhotoScroll: { width: "100%" },
+  detailPhotoTrack: { paddingLeft: 18, paddingRight: 30, gap: 12 },
+  detailPhotoFrame: {
+    width: 310,
+    height: 300,
+    alignSelf: "center",
+    position: "relative",
+    borderRadius: 22,
+    overflow: "hidden",
+    backgroundColor: "#E5E7EB"
+  },
+  detailImage: { width: "100%", height: "100%", backgroundColor: "#F3F4F6" },
+  awardPhotoBadge: {
+    position: "absolute",
+    left: 18,
+    bottom: 18,
+    borderRadius: 16,
+    backgroundColor: colors.cyan,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  awardPhotoBadgeText: { color: "#063F28", fontSize: 16, fontWeight: "900" },
+  photoCountBadge: {
+    position: "absolute",
+    right: 18,
+    bottom: 18,
+    borderRadius: 22,
+    backgroundColor: "#063F28",
+    paddingHorizontal: 16,
+    paddingVertical: 10
+  },
+  photoCountText: { color: "#FFFFFF", fontSize: 17, fontWeight: "900" },
+  nextPhotoButton: {
+    position: "absolute",
+    right: 20,
+    top: 132,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#063F28",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    ...shadow
+  },
+  prevPhotoButton: {
+    position: "absolute",
+    left: 20,
+    top: 132,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#063F28",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    ...shadow
+  },
+  nextPhotoText: {
+    color: "#FFFFFF",
+    fontSize: 30,
+    lineHeight: 34,
+    fontWeight: "900"
+  },
+  photoIndexBadge: {
+    position: "absolute",
+    right: 14,
+    top: 14,
+    borderRadius: 999,
+    backgroundColor: "rgba(6, 63, 40, 0.88)",
+    paddingHorizontal: 10,
+    paddingVertical: 6
+  },
+  photoIndexText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
+  detailSection: { paddingHorizontal: 24, paddingVertical: 24, borderBottomWidth: 1, borderBottomColor: "#E5E7EB" },
+  detailTitle: { color: "#063F28", fontSize: 34, lineHeight: 40, fontWeight: "900" },
+  detailMeta: { color: "#063F28", fontSize: 18, lineHeight: 28, marginTop: 10, fontWeight: "800" },
+  detailLinkRow: { flexDirection: "row", gap: 24, marginTop: 16, flexWrap: "wrap" },
+  detailLink: { color: "#063F28", fontSize: 18, fontWeight: "900", textDecorationLine: "underline" },
+  koreanSummaryCard: { marginHorizontal: 18, marginBottom: 8, borderRadius: 26, backgroundColor: "#063F28", padding: 18, borderWidth: 1, borderColor: "#0F6B45" },
+  koreanSummaryEyebrow: { color: "#FFD43B", fontSize: 13, fontWeight: "900", marginBottom: 8 },
+  koreanSummaryTitle: { color: "#FFFFFF", fontSize: 22, lineHeight: 29, fontWeight: "900" },
+  koreanSummaryCopy: { color: "#EAF7EE", fontSize: 15, lineHeight: 23, fontWeight: "800", marginTop: 9 },
+  koreanSummaryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
+  koreanSummaryPoint: { flexGrow: 1, minWidth: "47%", borderRadius: 16, backgroundColor: "rgba(255,255,255,0.1)", padding: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.16)" },
+  koreanSummaryPointTitle: { color: "#FFD43B", fontSize: 12, fontWeight: "900" },
+  koreanSummaryPointValue: { color: "#FFFFFF", fontSize: 14, lineHeight: 20, fontWeight: "900", marginTop: 5 },
+  detailSectionTitle: { color: "#063F28", fontSize: 26, fontWeight: "900", marginBottom: 14 },
+  detailParagraph: { color: colors.ink, fontSize: 18, lineHeight: 29, fontWeight: "700", marginBottom: 10 },
+  detailInfoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 12 },
+  infoItem: { width: "48%", borderRadius: 16, backgroundColor: "#FFF8E6", padding: 14, borderWidth: 1, borderColor: "#F0D89A" },
+  infoTitle: { color: colors.muted, fontSize: 13, fontWeight: "900" },
+  infoValue: { color: colors.ink, fontSize: 16, fontWeight: "900", marginTop: 5 },
+  visitCheckPanel: { marginTop: 18, borderRadius: 20, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5E7EB", padding: 14, gap: 12 },
+  visitCheckTitle: { color: "#063F28", fontSize: 17, fontWeight: "900" },
+  visitCheckRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  visitCheckDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FF9F1C", marginTop: 8 },
+  visitCheckTextBox: { flex: 1 },
+  visitCheckLabel: { color: "#063F28", fontSize: 14, fontWeight: "900" },
+  visitCheckValue: { color: colors.ink, fontSize: 14, lineHeight: 20, fontWeight: "800", marginTop: 2 },
+  featureList: { gap: 18 },
+  featureRow: { flexDirection: "row", gap: 14, alignItems: "flex-start" },
+  featureIcon: { width: 34, color: "#063F28", fontSize: 26, fontWeight: "900" },
+  featureTextBox: { flex: 1 },
+  featureTitle: { color: "#063F28", fontSize: 19, fontWeight: "900" },
+  featureCopy: { color: colors.ink, fontSize: 17, lineHeight: 26, marginTop: 4, fontWeight: "700" },
+  detailBenefitSection: { paddingHorizontal: 24, paddingVertical: 24, borderBottomWidth: 1, borderBottomColor: "#F0D89A", backgroundColor: "#FFF3C4" },
+  detailPartnerBenefitSection: { backgroundColor: "#FFF0B5", borderTopWidth: 1, borderTopColor: "#FFD43B" },
+  benefitHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 },
+  benefitBadge: { color: "#063F28", fontSize: 13, fontWeight: "900", backgroundColor: "#FFD43B", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  benefitBadgeActive: { color: "#FFFFFF", backgroundColor: "#FF8A00" },
+  benefitTitle: { color: "#063F28", fontSize: 20, lineHeight: 28, fontWeight: "900" },
+  benefitCopy: { color: colors.ink, fontSize: 16, lineHeight: 25, fontWeight: "800", marginTop: 8 },
+  benefitUseBox: { marginTop: 16, borderRadius: 20, borderWidth: 1, borderColor: "#F0B429", backgroundColor: "#FFFFFF", padding: 16, gap: 8 },
+  benefitUseLabel: { color: "#A15C00", fontSize: 13, fontWeight: "900" },
+  benefitUseText: { color: "#063F28", fontSize: 24, lineHeight: 32, fontWeight: "900" },
+  benefitGuideText: { color: colors.ink, fontSize: 15, lineHeight: 22, fontWeight: "800" },
+  benefitTermList: { gap: 6, marginTop: 4 },
+  benefitTermRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  benefitTermDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#FF8A00", marginTop: 8 },
+  benefitTermText: { flex: 1, color: colors.muted, fontSize: 13, lineHeight: 19, fontWeight: "800" },
+  benefitVerifiedText: { color: "#8A5A00", fontSize: 12, fontWeight: "900", marginTop: 4 },
+  benefitActionRow: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 16 },
+  benefitPrimaryButton: { flexGrow: 1, minHeight: 48, borderRadius: 16, backgroundColor: "#063F28", alignItems: "center", justifyContent: "center", paddingHorizontal: 14 },
+  benefitPrimaryText: { color: "#FFFFFF", fontSize: 15, fontWeight: "900" },
+  benefitSecondaryButton: { flexGrow: 1, minHeight: 48, borderRadius: 16, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#F0C24A", alignItems: "center", justifyContent: "center", paddingHorizontal: 14 },
+  benefitSecondaryText: { color: "#8A5A00", fontSize: 15, fontWeight: "900" },
+  reviewScoreCard: { flexDirection: "row", gap: 18 },
+  reviewBigScore: { color: "#063F28", fontSize: 56, fontWeight: "900" },
+  reviewScoreLabel: { color: "#063F28", fontSize: 18, fontWeight: "900", marginBottom: 8 },
+  reviewBars: { flex: 1, gap: 12 },
+  reviewBarRow: { gap: 6 },
+  reviewBarLabel: { color: "#063F28", fontSize: 15, fontWeight: "900" },
+  reviewTrack: { height: 10, backgroundColor: "#E5E7EB", borderRadius: 999, overflow: "hidden" },
+  reviewFill: { height: "100%", backgroundColor: "#009A44" },
+  commentHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  commentCount: { color: "#063F28", fontSize: 16, fontWeight: "900" },
+  commentBox: { flexDirection: "row", gap: 10, marginBottom: 18 },
+  commentInput: { flex: 1, minHeight: 52, borderRadius: 18, backgroundColor: "#F9FAFB", paddingHorizontal: 14, color: colors.ink, fontSize: 16, fontWeight: "800" },
+  commentSubmit: { minWidth: 72, borderRadius: 18, backgroundColor: colors.cyan, alignItems: "center", justifyContent: "center" },
+  commentSubmitText: { color: "#271400", fontSize: 15, fontWeight: "900" },
+  commentCard: { flexDirection: "row", gap: 12, paddingVertical: 16, borderTopWidth: 1, borderTopColor: "#EEF2F7" },
+  commentAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#FFF1C2", alignItems: "center", justifyContent: "center" },
+  commentAvatarText: { color: "#063F28", fontSize: 18, fontWeight: "900" },
+  commentBody: { flex: 1 },
+  commentName: { color: "#063F28", fontSize: 18, fontWeight: "900" },
+  commentMessage: { color: colors.ink, fontSize: 17, lineHeight: 27, marginTop: 8, fontWeight: "700" },
+  detailIconButtonActive: { backgroundColor: "#FFE166" },
+  trustHero: { borderRadius: 24, backgroundColor: "#FFF6D9", padding: 16, borderWidth: 1, borderColor: "#F5C84C", marginBottom: 20 },
+  trustHeroHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  trustBadge: { color: "#063F28", fontSize: 15, fontWeight: "900", backgroundColor: "#FFD43B", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
+  trustScore: { color: "#063F28", fontSize: 28, fontWeight: "900" },
+  trustHeroTitle: { color: colors.ink, fontSize: 17, lineHeight: 25, fontWeight: "900", marginTop: 12 },
+  trustMetricGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
+  trustMetric: { flexGrow: 1, minWidth: "31%", borderRadius: 16, backgroundColor: "rgba(255,255,255,0.74)", padding: 12, borderWidth: 1, borderColor: "#F1D48A" },
+  trustMetricTitle: { color: colors.muted, fontSize: 12, fontWeight: "900" },
+  trustMetricValue: { color: "#063F28", fontSize: 15, fontWeight: "900", marginTop: 5 },
+  thumbnailRail: { paddingHorizontal: 18, gap: 8, paddingTop: 10 },
+  thumbnailFrame: { width: 66, height: 54, borderRadius: 12, overflow: "hidden", borderWidth: 2, borderColor: "#FFFFFF", backgroundColor: "#E5E7EB" },
+  thumbnailFrameActive: { borderColor: "#063F28" },
+  thumbnailImage: { width: "100%", height: "100%" },
+  detailPhotoEmpty: {
+    marginHorizontal: 18,
+    minHeight: 260,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF8E6",
+    borderWidth: 1,
+    borderColor: "#F0D89A",
+    padding: 24
+  },
+  detailPhotoEmptyTitle: { color: "#063F28", fontSize: 24, fontWeight: "900" },
+  detailPhotoEmptyCopy: { color: colors.muted, fontSize: 15, lineHeight: 22, fontWeight: "800", marginTop: 8, textAlign: "center" },
+  situationBox: { marginTop: 12, marginBottom: 8, borderRadius: 18, backgroundColor: "#F5FAF4", padding: 14, borderWidth: 1, borderColor: "#D9EBDD" },
+  situationTitle: { color: "#063F28", fontSize: 16, fontWeight: "900", marginBottom: 10 },
+  situationChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  situationChip: { color: "#063F28", fontSize: 14, fontWeight: "900", backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#BBD8C4", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  reviewScoreSummary: { width: 132 },
+  reviewScoreSub: { color: colors.muted, fontSize: 13, fontWeight: "800", marginTop: 8 },
+  reviewBarHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  reviewBarCount: { color: colors.muted, fontSize: 13, fontWeight: "900" },
+  aspectGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 18 },
+  aspectItem: { width: "48%", gap: 7 },
+  aspectHeader: { flexDirection: "row", justifyContent: "space-between" },
+  aspectLabel: { color: "#063F28", fontSize: 14, fontWeight: "900" },
+  aspectScore: { color: colors.ink, fontSize: 14, fontWeight: "900" },
+  aspectTrack: { height: 8, backgroundColor: "#E5E7EB", borderRadius: 999, overflow: "hidden" },
+  aspectFill: { height: "100%", backgroundColor: "#009A44", borderRadius: 999 },
+  commentComposer: { borderRadius: 20, backgroundColor: "#FFF8E6", padding: 12, borderWidth: 1, borderColor: "#F0D89A", marginBottom: 18 },
+  commentModeRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
+  commentModeButton: { borderRadius: 999, borderWidth: 1, borderColor: "#E6D7B5", paddingHorizontal: 12, paddingVertical: 8, backgroundColor: "#FFFFFF" },
+  commentModeButtonActive: { backgroundColor: "#063F28", borderColor: "#063F28" },
+  commentModeText: { color: colors.muted, fontSize: 13, fontWeight: "900" },
+  commentModeTextActive: { color: "#FFFFFF" },
+  commentRatingRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
+  commentRatingLabel: { color: "#063F28", fontSize: 14, fontWeight: "900", marginRight: 4 },
+  commentRatingDot: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: "#009A44", backgroundColor: "#FFFFFF" },
+  commentRatingDotActive: { backgroundColor: "#009A44" },
+  commentTagRail: { gap: 8, paddingBottom: 10 },
+  commentTagButton: { borderRadius: 999, borderWidth: 1, borderColor: "#E6D7B5", paddingHorizontal: 11, paddingVertical: 7, backgroundColor: "#FFFFFF" },
+  commentTagButtonActive: { backgroundColor: "#FFE166", borderColor: "#FFD43B" },
+  commentTagText: { color: colors.muted, fontSize: 13, fontWeight: "900" },
+  commentTagTextActive: { color: "#063F28" },
+  commentTopLine: { flexDirection: "row", justifyContent: "space-between", gap: 10, alignItems: "center" },
+  commentDate: { color: colors.muted, fontSize: 12, fontWeight: "800" },
+  commentMetaRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 5 },
+  commentVisitBadge: { color: "#063F28", fontSize: 12, fontWeight: "900", backgroundColor: "#E7F6EA", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
+  commentTags: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 },
+  commentTagPill: { color: "#063F28", fontSize: 12, fontWeight: "900", backgroundColor: "#FFF1C2", borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
+  emptyCommentCard: { borderRadius: 18, backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: "#E5E7EB", padding: 16, marginTop: 10 },
+  emptyCommentTitle: { color: "#063F28", fontSize: 18, fontWeight: "900" },
+  emptyCommentCopy: { color: colors.muted, fontSize: 14, lineHeight: 21, fontWeight: "800", marginTop: 6 },
+  detailReportSection: { paddingHorizontal: 24, paddingVertical: 24, borderBottomWidth: 1, borderBottomColor: "#E5E7EB", backgroundColor: "#FFF8E6" },
+  reportChipGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6, marginBottom: 16 },
+  reportChip: { color: "#063F28", fontSize: 13, fontWeight: "900", backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#F0D89A", borderRadius: 999, paddingHorizontal: 11, paddingVertical: 7 },
+  reportButton: { minHeight: 52, borderRadius: 18, backgroundColor: "#063F28", alignItems: "center", justifyContent: "center" },
+  reportButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "900" },
+  helpfulButton: { alignSelf: "flex-start", marginTop: 10, borderRadius: 999, borderWidth: 1, borderColor: "#D9EBDD", paddingHorizontal: 11, paddingVertical: 7, backgroundColor: "#FFFFFF" },
+  helpfulButtonText: { color: "#063F28", fontSize: 12, fontWeight: "900" },
+  reportOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(6, 20, 12, 0.42)"
+  },
+  reportBackdrop: {
+    ...StyleSheet.absoluteFillObject
+  },
+  reportSheet: {
+    maxHeight: "88%",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    backgroundColor: "#FFF8E6",
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 24,
+    borderWidth: 1,
+    borderColor: "#F0D89A",
+    ...shadow
+  },
+  reportSheetHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingBottom: 14
+  },
+  reportSheetTitleBox: { flex: 1 },
+  reportSheetEyebrow: { color: "#FF9F1C", fontSize: 13, fontWeight: "900" },
+  reportSheetTitle: { color: colors.ink, fontSize: 24, lineHeight: 30, fontWeight: "900", marginTop: 4 },
+  reportSheetCopy: { color: colors.muted, fontSize: 14, lineHeight: 20, fontWeight: "800", marginTop: 5 },
+  reportCloseButton: {
+    minWidth: 58,
+    minHeight: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#F0D89A"
+  },
+  reportCloseText: { color: "#8A5A00", fontSize: 13, fontWeight: "900" },
+  reportFormContent: { paddingBottom: 12, gap: 12 },
+  reportHint: { color: "#8A5A00", fontSize: 13, fontWeight: "900" },
+  reportField: { gap: 8 },
+  reportFieldLabel: { color: colors.ink, fontSize: 14, fontWeight: "900" },
+  reportInput: {
+    minHeight: 52,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#F0D89A",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 14,
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: "800"
+  },
+  reportTextArea: {
+    minHeight: 110,
+    paddingTop: 13,
+    textAlignVertical: "top"
+  },
+  reportChipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  reportChoiceChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#E6D7B5",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 13,
+    paddingVertical: 9
+  },
+  reportChoiceChipActive: {
+    borderColor: "#FFD43B",
+    backgroundColor: "#FFD43B"
+  },
+  reportChoiceText: { color: colors.muted, fontSize: 13, fontWeight: "900" },
+  reportChoiceTextActive: { color: "#271400" },
+  reportErrorText: { color: "#E11D48", fontSize: 13, lineHeight: 19, fontWeight: "900" },
+  reportSuccessBox: {
+    borderRadius: 22,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D9EBDD",
+    padding: 18,
+    gap: 10
+  },
+  reportSuccessTitle: { color: "#063F28", fontSize: 22, fontWeight: "900" },
+  reportSuccessText: { color: colors.ink, fontSize: 15, lineHeight: 22, fontWeight: "800" },
+  reportSubmitButton: {
+    minHeight: 56,
+    borderRadius: 18,
+    backgroundColor: "#FF9F1C",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4
+  },
+  reportSubmitButtonDisabled: { opacity: 0.58 },
+  reportSubmitText: { color: "#FFFFFF", fontSize: 16, fontWeight: "900" }
+});
+

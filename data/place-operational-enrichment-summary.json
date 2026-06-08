@@ -1,0 +1,161 @@
+{
+  "generatedAt": "2026-06-05T09:50:19.189Z",
+  "apply": true,
+  "refresh": false,
+  "limit": null,
+  "city": null,
+  "concurrency": 2,
+  "before": {
+    "total": 1190,
+    "hours": 1137,
+    "phone": 1083,
+    "website": 806,
+    "price": 333,
+    "photos2Plus": 1186,
+    "menus": 0
+  },
+  "after": {
+    "total": 1190,
+    "hours": 1143,
+    "phone": 1089,
+    "website": 811,
+    "price": 337,
+    "photos2Plus": 1186,
+    "menus": 0
+  },
+  "requested": 6,
+  "fetched": 6,
+  "cached": 940,
+  "changedPlaces": 12,
+  "changedFields": {
+    "나트랑exchangekimchungchija1ilnzpncderez5yrfqzujo": [
+      "photoNames",
+      "photoName"
+    ],
+    "dalat-banh-can-nha-chung": [
+      "photoNames",
+      "photoName"
+    ],
+    "dalat-herbal-spa": [
+      "photoNames",
+      "photoName"
+    ],
+    "달랏exchangehieuvangkimhoaminhchijoe9jncwtcteri0kzb8pzs": [
+      "photoNames",
+      "photoName"
+    ],
+    "푸꾸옥cafecoffeephobienchij1x0bc4anpzer6hauwefo2tc": [
+      "coordinates",
+      "reviewCount",
+      "googleMapsUri",
+      "businessStatus",
+      "photoNames",
+      "photoName",
+      "lastVerifiedAt"
+    ],
+    "regional-phuquoc-coffee-house": [
+      "address",
+      "coordinates",
+      "rating",
+      "reviewCount",
+      "googleMapsUri",
+      "internationalPhoneNumber",
+      "nationalPhoneNumber",
+      "businessStatus",
+      "openNow",
+      "openingHoursText",
+      "photoNames",
+      "photoName",
+      "lastVerifiedAt"
+    ],
+    "regional-phuquoc-i-love-phuquoc": [
+      "address",
+      "coordinates",
+      "rating",
+      "reviewCount",
+      "googleMapsUri",
+      "websiteUri",
+      "internationalPhoneNumber",
+      "nationalPhoneNumber",
+      "businessStatus",
+      "openNow",
+      "openingHoursText",
+      "photoNames",
+      "photoName",
+      "googlePriceLevel",
+      "priceLevel",
+      "priceDataSource",
+      "lastVerifiedAt"
+    ],
+    "regional-phuquoc-rorys": [
+      "address",
+      "coordinates",
+      "rating",
+      "reviewCount",
+      "googleMapsUri",
+      "websiteUri",
+      "internationalPhoneNumber",
+      "nationalPhoneNumber",
+      "businessStatus",
+      "openNow",
+      "openingHoursText",
+      "photoNames",
+      "photoName",
+      "googlePriceLevel",
+      "priceDataSource",
+      "lastVerifiedAt"
+    ],
+    "푸꾸옥night로리스비치바chijyvpqmqsjpzerq2jrug6wqke": [
+      "coordinates",
+      "reviewCount",
+      "googleMapsUri",
+      "websiteUri",
+      "internationalPhoneNumber",
+      "nationalPhoneNumber",
+      "businessStatus",
+      "openNow",
+      "openingHoursText",
+      "photoNames",
+      "photoName",
+      "googlePriceLevel",
+      "priceDataSource",
+      "lastVerifiedAt"
+    ],
+    "푸꾸옥nightocsenbeachbarclubchij1aeq29snpzerq6q22sukyrc": [
+      "coordinates",
+      "reviewCount",
+      "googleMapsUri",
+      "websiteUri",
+      "internationalPhoneNumber",
+      "nationalPhoneNumber",
+      "businessStatus",
+      "openNow",
+      "openingHoursText",
+      "photoNames",
+      "photoName",
+      "googlePriceLevel",
+      "priceDataSource",
+      "lastVerifiedAt"
+    ],
+    "푸꾸옥nightthecheekytravellerenglishpubbarchijaz1j0mnpzeryq40gmjmoui": [
+      "coordinates",
+      "reviewCount",
+      "googleMapsUri",
+      "websiteUri",
+      "internationalPhoneNumber",
+      "nationalPhoneNumber",
+      "businessStatus",
+      "openNow",
+      "openingHoursText",
+      "photoNames",
+      "photoName",
+      "lastVerifiedAt"
+    ],
+    "푸꾸옥photo키스오브더씨쇼chijtsq7ywmvpzervzagy4swzus": [
+      "photoNames",
+      "photoName"
+    ]
+  },
+  "failures": [],
+  "menuPolicy": "Google Places Details does not provide verified per-menu item lists for most places. No menu items were generated or guessed."
+}

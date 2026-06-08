@@ -1,0 +1,262 @@
+{
+  "generatedAt": "2026-06-04T06:15:22.426Z",
+  "source": "Google Places API Place Details",
+  "mode": "preview",
+  "note": "리뷰 원문과 Google 사진 파일은 앱에 복사 저장하지 말고, 구조화 정보와 photo resource name만 저장하세요.",
+  "total": 5,
+  "places": [
+    {
+      "id": "bros-korea-1980s-chijj-ytx4ivdter-bo0wjunwde",
+      "city": "호치민",
+      "name": "BROS KOREA 1980s (본점)",
+      "googlePlaceId": "ChIJJ_YTX4IvdTER-Bo0wjUNwdE",
+      "previous": {
+        "address": "47 Nguyễn Thị Diệu, Xuân Hòa, Hồ Chí Minh 70000",
+        "rating": 4.9,
+        "userRatingCount": 47211,
+        "priceLevel": "보통",
+        "photoName": "places/ChIJJ_YTX4IvdTER-Bo0wjUNwdE/photos/Ab43m-tb6FHaNLEd4So7BVPmWAak-ivSDTrmCxF0XboPAfwqyHaOk4FD8WfzRkM3OB4G6Q5CW67Nkdk1vleOpJ7TJs3T6okb0a5Hn5WMOZFty4XOd5CaV9wWnB0KEZpecV_0oyoi5TPRihPVMm3k8sTF9VhVz4Cu1vqTeaWvt2BlCqT5BpzksZ3svwFE8c4pimJAGeoW3M3t554dRY_JWRSdytPqXXE3CiL_gpAKf5L1iRP4zQXH99Cnsb_oTo6rsxOZnM4G3otkF4omaJ0s83XLgN745swqVhNMQiUyVoALAxWuog",
+        "googleMapsUri": "https://maps.google.com/?cid=15114376348974717688&g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA"
+      },
+      "latest": {
+        "name": "BROS KOREA 1980s (본점)",
+        "address": "47 Nguyễn Thị Diệu, Xuân Hòa, Hồ Chí Minh 70000",
+        "coordinates": {
+          "latitude": 10.774844199999999,
+          "longitude": 106.6877962
+        },
+        "rating": 4.9,
+        "userRatingCount": 47550,
+        "priceLevel": "PRICE_LEVEL_MODERATE",
+        "googleMapsUri": "https://maps.google.com/?cid=15114376348974717688&g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA",
+        "websiteUri": "https://www.broskorea1980s.com/",
+        "internationalPhoneNumber": "+84 28 3930 0999",
+        "nationalPhoneNumber": "028 3930 0999",
+        "businessStatus": "OPERATIONAL",
+        "openingHoursText": [
+          "월요일: 오전 11:00 ~ 오후 11:00",
+          "화요일: 오전 11:00 ~ 오후 11:00",
+          "수요일: 오전 11:00 ~ 오후 11:00",
+          "목요일: 오전 11:00 ~ 오후 11:00",
+          "금요일: 오전 11:00 ~ 오후 11:00",
+          "토요일: 오전 11:00 ~ 오후 11:00",
+          "일요일: 오전 11:00 ~ 오후 11:00"
+        ],
+        "openNow": true,
+        "photoNames": [
+          "places/ChIJJ_YTX4IvdTER-Bo0wjUNwdE/photos/Ab43m-uWdcQIenZR0eUEZAwUgklWGbNcg7-FQFxQ2O70eO1Xx7d6R0dBVCsDYpwD2u6cUSWcIeY9MI4X_N2NBfarOi2r-9a-k8Bku63ukCuI_L6DwjhzBb1QaSOQnwaFoL_Gfe8YGjyKdbXaIojrWZEBbfM3evEfCfbcGlftumMD-MoqHHb287nSPvVML6FggnbyGnKhGwWr5mDw9yHwR9t97GFINeFEBiio7wcwyKssk6ui3BzHYmk3LVtamkO98kcAj4LCVuXhdOHDfkXgDboX6RSrE_5dDSmyxNs8IcmhOvPwxD0TKpkE60a211BSdmo0HrETATr_mfPXtOFYONWhba8CYvnyz0X7Xm1-pAmntgcRRXZ9R1aA33oPIl6g6NQ4JgoFRqkvYp6gihe0FE25XiA_XPQMe2_jtGA3QCR-7VK4HZVl",
+          "places/ChIJJ_YTX4IvdTER-Bo0wjUNwdE/photos/Ab43m-sjxGfoxLPYHN8Cg1drcr83KriEKKPqt5X9JWwXvRiTYK10piVhcXaEoeWQWF_OU6W090QF83kTtCM-aETUwfBIvjWEIu4nsh7IJ5J5nHjC_TWX73oiOo4FzqV4sbJ8RKGkqwqmi3pKP07K8xN2pZUEium-sf5-2kfYQfDcrDaeP601gLW1T3By8Qv0GPBxbBwT0QurNzwIIb99Us6IlI9Lqws0cBb1Aq0_3nuH8oumRu7rJ8ry80AnHDY-mcGE3vhjrKGKnUBG3kA2nQqAf2jMqz2N6RKHJZCkmRT1DjaafrdAyxclNk61ONb1YGudHGfiVcnx5TGpH1HZjZd4JhQoNvop9q0-28uXE4OTBMyBr0lvelQTBVWN4TuyhY6awNSdjApEoql9PWrdRqSjQgltMZXyCRfrLKO5uQp1Lv84gQ",
+          "places/ChIJJ_YTX4IvdTER-Bo0wjUNwdE/photos/Ab43m-sypIw34spOPGv3Oy7DyBdcpr7f0OHTbBzy8PvsDBtOCAxuw6X54tqXui7ScsBXtzmZFGkLxCCtD5VDy60GJnWjqOjF29HQqHUVc5Xn6kmC2j0u-6haibUziEx503YSAp-loVOwSBNUzPTg2-OJctsiXPyvRccrpCWmLHw2JEmd8ChyDbhTaHmS2hNdw-SyC6KzRJdB-KLaF5oclKcinGzkgyWNCEdpj1xMms-dc8VQh7wxgEAN8QMziG1BlcCoSikHYRAPChlFxYcI-wMKRY-8BLdSsZrCoxkupw7hth2rL785tE3an1CPtwZ38L4z4n_Z8ztADG3TCclNvvfRoFl1NDDoeMh9JJYIlIxezjnS1R7lqh2QTJFrBuP_htPc0Szhd9MFhX6dX5yUna_2KNVPyseHla7aU-cKN0Kaa09sjstzcSYQFNTCwB1gTlGM",
+          "places/ChIJJ_YTX4IvdTER-Bo0wjUNwdE/photos/Ab43m-uAvWx6plsBHvJ8-4wXleVXj6i57wTPeAaZrTJfaHMn6S0UsNwYJ_bbXxrA_SPc9Lh6xhlEZQ49mGhTHnrhvAGqDW4azLbqxQapQWb9IYJ-iIWEy-cgVsYOHMjcOxmKFtK0y2si_wVqe5MWArr4yTHzAWTOyDloZY2ByJd7dt8ZKWJsutGJclVSgMXPDv0BLTixGk-PxhViwCRrNhFTHUUydwb8oE4Z0b2SABP7PncaxzIjRYrOavbwBrr6sdfHphKI2_6xcsy6C_hOwacCp4g4fIW8zcKNVNkRixCzwlyO84BOhZM3NB5wqziX9OxE0nswKOypLxEvxhnVaIiYXYhhUQQ6QHtu2XvcfDg4yL7fRgpQBqzSJIHUZz1ReD0DQVn-esj6y8ritiWnnuh2LO_QaSD9HzVybIm4Ryumjw-w1xJKVVp-9Ztmv9pt8W8d",
+          "places/ChIJJ_YTX4IvdTER-Bo0wjUNwdE/photos/Ab43m-svobMojkG30Yboer0fCAfyixEtit0EdkN0vRLlCy6tGOww3A3ZZZh99KDcSDoD2oP71OtRg_S4bxNPaUAjAjRLQs_4xnb6ABSsh1SI8aRG1zhTpdtDryYOKcckgXMLGpEKirzBaT5nfxo84HUcn9RvZ6sFbA91a77Fq17eCZwUrZYP6i5xtZVe39gGJWEpxOUutJJ2sxbzBJUsJY3YG409aWxhpDVqOarlqOHIND3ci7Ycfr34CRo6TWFkREZSZ5MUef0SuDlVb5RSLIPcKDP40NOomPrSjBWRsIWVw7foHTuDImufrEs2KHq_7qDFJWpwABUG1o8rXJ3YoZXCPqYpTAlv8n3oWg-UfHnnNTupQvC3GYO70WqR0tvaGQIXUThPOmTC00OYCADkUl5Xvtbcn6wixZqKN3JMndzfCXRkb4jHC1mr1lVuClPAe9vE",
+          "places/ChIJJ_YTX4IvdTER-Bo0wjUNwdE/photos/Ab43m-sLk8ybiIEsURqp2oZ3qF7xxc8oLeUDu_Vd164EaYBS-kiwv4QL9mNQmTdhojWUa-8RSQSnGUpeQU4mCAhsOmlg2Y-wiK-kxufXnN0HGoLsOIzMq0Jfh6pkXVFyNsw22gwNjBUL4zR2i0yHBd2JqM9qGhvCFEYoBTIx0rT6JvRmVkhZVDkPMfFAFVWvSweVoMvWaev8G5qJxuesaA8wXkIPrsoheG3_lzZVofQseTIXg2iUa5_qjNarhixG38xdoEZkM84pa1kgPROWuLi1AN1ThDM-dZYgI6i9bed4n5p4pAChbaXAPxFO1qDTuM-hqaPFpJ0yBr356GkaUGD5pcyg2_rKcSYitXUCf_LUx5bcaMKJarPNRnni-2BkMBTENHXi_fOK8TqUH9TtlB1HGH2CW5Vm4F875cvsL7Bg-izi624QaUX9qNS3HTls_AQF",
+          "places/ChIJJ_YTX4IvdTER-Bo0wjUNwdE/photos/Ab43m-sxqEUFFJBH8tkXRKuY2Xfys7Bb60ZhkMYzJ-5d4DHgkayFXEKoPW1dXVVOdYOlslWGD5MfMsbaAu2mKjt36JchazLKv_fyG-5acJhFKbiBozXoPFLpGH7CTMdsvsSpW4raF5PbXyJPP8Ut7xUpNLogrOyg6xRP3NIP9QAN4z82me4cmtw5lQ8_RXsb0usjbknvGNXYqT5a8iM6Jt7APbPH2lo-gwCliA_1Tn9-OUe_S-1ZHat39CMfgn1LiF16Z6j-7KPrQJ0zGB8D00f5HR8Xms-S5xnr12wwbAhUyoZaPt6ca_UYODCICe3BAIl05jpptyL4DmwvzKdiAdHWlNi4ypo0RuEPvipVAYEAeOIAvbDtjx_GfRGsooe_Brp8jY0Tb5h2N-SEgLtArAaxPq4TibDKy0xIhd5PnyOFhXAa9idjIa9Oz6ZRqCOD5aam",
+          "places/ChIJJ_YTX4IvdTER-Bo0wjUNwdE/photos/Ab43m-sqM-KeUGvEEf0JLcfN4oeR4XfdxGO9Bbk8aMYQUA-9BU9zGJY1NJmr2X6JMlXJOEnwdo5zBI87SPfejKDQTAdOXSTgmUTYu7JBIscBjmMDjbMCaKExUnhyNRex6LOpESxItlWwibrEGOitv-2gbnFKY3-9o5mZG9t0xHRWq6sr2w-d7aluehxti6Ayq4TTjQIJokAUt5MK-qYc7fqhmPq_ZcVKiRKHAPfYQQrjDPnHa7dmR6lOhThX-kxIxVEJEzcD6unoP3oDpHz1jOAZw7u2L999DPnipsqdrPtQpk1EQ966jwq5z0nrf1jaruMGoKbUmv4o7qmI-Qrhn-2YuvNm_m64AzBlXJBm9NbuhJ6s0GBaM39vsuAri9JdmTi6KcgdDBSOvDyWsmKyQsNbtTfIA8UIM_ko0en4-_zQWU_BsnJbfo3qFmtJrgbwWA"
+        ]
+      },
+      "checkedAt": "2026-06-04T06:15:21.733Z"
+    },
+    {
+      "id": "hoang-s-kitchen-vietnamese-cuisine-vegan-food-chijprpskhwvdterhhkis0es9pq",
+      "city": "호치민",
+      "name": "Hoang’s Kitchen -Vietnamese cuisine & Vegan food",
+      "googlePlaceId": "ChIJPRPSKHwvdTERHHkiS0Es9PQ",
+      "previous": {
+        "address": "45 Thủ Khoa Huân, Bến Thành, Hồ Chí Minh 700000",
+        "rating": 4.9,
+        "userRatingCount": 19262,
+        "priceLevel": "보통",
+        "photoName": "places/ChIJPRPSKHwvdTERHHkiS0Es9PQ/photos/Ab43m-toWXBKrzMmP7nt7wjyPAsAL3I3ejkS2AB48DOoUTV81NKKEdx5ypB0e8VRd0dTnozKpwIzGShyyX7UbEqzcdr86_DYIhDzLuYVq5AcXbR15EoGgFKfRT1GfZYhP1WV7SZl-dqVWZ1X_QGdJdPx77mKqjRwP52SpRwWrc4epo2CW7uIGSbZPu7_iOGZaT9AXtUsfNKVAR1cCSzvsvxmngKPLZJh4SGEzo7m6GYzyt6bYaJD-6er08TVTKW6hIGXGYIf8CZ0kYFbALnGYtDJQQdr-NIg3JGWZhmbynbU2zlNNw",
+        "googleMapsUri": "https://maps.google.com/?cid=17650781498516863260&g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA"
+      },
+      "latest": {
+        "name": "Hoang’s Kitchen -Vietnamese cuisine & Vegan food",
+        "address": "45 Thủ Khoa Huân, Bến Thành, Hồ Chí Minh 700000",
+        "coordinates": {
+          "latitude": 10.774218000000001,
+          "longitude": 106.6966059
+        },
+        "rating": 4.9,
+        "userRatingCount": 19391,
+        "googleMapsUri": "https://maps.google.com/?cid=17650781498516863260&g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA",
+        "websiteUri": "https://hoangskitchen.com/locations/",
+        "internationalPhoneNumber": "+84 912 993 203",
+        "nationalPhoneNumber": "0912 993 203",
+        "businessStatus": "OPERATIONAL",
+        "openingHoursText": [
+          "월요일: 오전 10:00 ~ 오후 11:30",
+          "화요일: 오전 10:00 ~ 오후 11:30",
+          "수요일: 오전 10:00 ~ 오후 11:30",
+          "목요일: 오전 10:00 ~ 오후 11:30",
+          "금요일: 오전 10:00 ~ 오후 11:30",
+          "토요일: 오전 10:00 ~ 오후 11:30",
+          "일요일: 오전 10:00 ~ 오후 11:30"
+        ],
+        "openNow": true,
+        "photoNames": [
+          "places/ChIJPRPSKHwvdTERHHkiS0Es9PQ/photos/Ab43m-v21EvzlWCRQZzOE4ctNoDtTCQvURI3zzk8bEc0oHwXLAF2NEXqin4HZ8l9k7et5PYWNJqvfUC7CWLpHM2Zb6Z-kwvBRoa3VA1CbzqT3qE3gEl64uWxVZLGV_0ARbalRVATKzc8iXBAyhCRoFiyS-GkIudrG-mS5PqlLqn5SEkc_hOOb1RyEsnH6JQNLB1hbGS9WYpxS6M54jhulkK1zjSlGI1_NVHsAQU7Bn5dSu4TpScGGrbwZTdCocRaWA6_BArhT3ldVhMFW6TrxucyZSxirULgix04OeBVWcPPx8Pss-t2OT24puot-jUzKExGBOS6qo9ijZtCagYmaDO7s4YjldvLCZVhiH__pg3C_KJ-Z_q1X8uENCnmtlHtzJxBeSTcuLG8oVTrRvxqYpvDJW4bskKBx4b7Pdeh0nZqN5ZkXg",
+          "places/ChIJPRPSKHwvdTERHHkiS0Es9PQ/photos/Ab43m-vCZokXUbIVT6Q2npmxVjRM3Ixbknjrtgfu440s2Z3N9YWm5wMsjFO50ZrAVyRFhuJEl11tVmkaqorj9rzyVWx0uZedjmhYiOxWjeZdIwJQZfK96qs8VLuQMSnflZxy0cOJ9YUOnh7imwo7rGo7rmM8yAUeY2cr7etGi14F4xM0XKCizfRe_gToVHYYSUgWjz3ibr9ucNkFbnpxvIbiYpRw8By6QKGz76fB4-VSZTv4lfon1LyZi2fAMJrqwor1ol1HmwRs5aaw8j3d3etziKEeiL-4j6i7vJ3PJQ14kvk-MlB-DmWKG2Z4yjR7-54XmUCGrCmEKblJiN6jHIH0qkD3CkE6GT48pOT2L8ckms1_wi7Ja5l-g8LBMAbu9xotwy_H-1R9aRMmYi3tpmG3HAlLlwfWV9CjT6DY8Wxw27eIN3KUtWoLBrAAkceL0kIA",
+          "places/ChIJPRPSKHwvdTERHHkiS0Es9PQ/photos/Ab43m-uR0lY_ZHGLK4BBXapSTm68noU_BAYaoM4K-jk0bCyRU_Q-3o77PhqSOhgbZO25EgVr5UslDQ9WZjOXGWKzlwTF-glSjVpHvSjs89m-mcAIOUvsYXlf_QNUcPN3d7DHm4jVdrxK4Og2PXTY5zuyWfpyQ0UHbpoNZcb2vROhCKBtCMrnClZNxKERacbuuCJOiBQdg3As94y4Z1Gc2ra4-V33vl-jHnu2pardYqYnlFD7hDYrnOOeaiBS-0Wz6a66n2eMUo0mPXMNwpeV7Sc19kQd9bSD5jgFTqz9sbPSzRXRJpujfuBcjJ8Y4v_R6qXNi_gF48uOSIuxD6rS1DlrN7oslVQMpoguPTaU2cj302AGZYc-R7Oc9IABQdUIuhQjXG-Trzc4Qar6zXfPlkLi-KgIe51SN9hdeuI_hjUM3zAW5UsXoQTLEAkMaUgpXH3L",
+          "places/ChIJPRPSKHwvdTERHHkiS0Es9PQ/photos/Ab43m-sA3lFgRZgjDdnAOc273V_PMK4XngT10ob_jeYgqGzHNq_UI7DtmC1TIl_fPzWD4TIHIbZFEyQotCI8n4hd0JxgRH6kZ9veSXJQwAEGK-hr4ur0JfxIQUqwWs2HznE0w4E_XGLusjWLn0wgZlxmlUQmSvDL-OBpJxoLJa3cHrvDguVfXVBgcM2_hYUR6msQSMywicWTu5PWeM4R4l3KqC6gVhHg7PCAtuyEHpOpm-aw4aRemyOVkNWdl-Q7JWJa2JtNNWwQvLyqmomhofpVhXmLMGnXWUtRtox_5C36vMjRgKvGL65YkqTkqhaF5LnFKBg5ZkmLVVZclh-82Qv6egz-X8bCaqLYq9FBjV4x_5xBP9euAibv52CdMKwwqmlpXlotAjotMgOLxo74sPtNyv-mXpL0D93aVlEhZqksgOK3Y1aj053iAxPSMg9Db-yA",
+          "places/ChIJPRPSKHwvdTERHHkiS0Es9PQ/photos/Ab43m-vLebxv4x7WDjKHpO8EYv9jBX95iKcBJ-iHZ01e1E3qle4NcohQe_EXqe7tfQDek6HCQhFK8prPivTC-NKiDS3E3IUcVBjfAqRxYL3lxODFiKwvVnDkq3I8tmMgrTnD71RJX2YY4mpEVaQqe49OjexAN8x6uCwsja4zC4TFN4222E3TZ9Y8A3AGfaPFJKK1aiqAa8DxUks7XPq9ztsMwKPgIyN47bGhDmxidQl3_iT4-oy6gRdOeUfm8rcbb9hfrdE4Z3k8R6DN_fGCwnl9vOo3i1kls3l4yBMIyj-eZb22sAYVnN7CisWAI8DGWvwbtIfc9oqkCqh7S4DOicbeNheLPZxgbVTz6hxxRy8-8sg8y6rGdUUSxkM_TciJM3kEM_-g_VH-IR6QdCaDwtN3vUuSSpi_JXdl5N1sTPb8ZCJimt4SOCK6KxT3NjKNPJDU",
+          "places/ChIJPRPSKHwvdTERHHkiS0Es9PQ/photos/Ab43m-tiOxCfzKZu9fccYTsB5StxmUoJOUQzlW7wr9bdjv7kRw2tSshM2BGlYzsOqW4-xB2zc6PI-3ZlfPJBQGR3L1KcbTGfmslxrtwXIYaNjDs0hocHO8GNVV6WxDj9jsyHrtXJElDrR2dM4vx29hTeLfmBzsaFuJ_GdrNzi97Eg8kXCV8r5NhoaIDdrmPMc1PZXMMLxj3E9TLgACxVMRbEvdn9WXNhu6HBQp9LSlNWly46KJ0a8pKZwNjExZQX3XyeLiPVB1vHCTsx7DFKqgYFUZ9qmsHUunbhQVs4Jp_wHZ-5bjN5fokFttcJizNwtEBHxMwbDNALctF7PUtMIezbTlf-UDe-ioR6O2eh2BUmOFcL3Og0t9DyceU-1daed1IFConYCIOODHQpRfZ_CGeXCEPpxd-mPtcfQfhfZsjphtXWV56OyL4aBuWtpAMBB4OM",
+          "places/ChIJPRPSKHwvdTERHHkiS0Es9PQ/photos/Ab43m-tvieBDhg3TP6lA2liW1wHEthf-joBl4_gy810w_1mgpj63hFALknRrv63L-SzNmMq3G1thSutxTBMCi-6QBP1b4aX9z92M9bVqFK7VzCo0ecwptTOKunSikbLIyy6nQaSUUfa5Ml8QvGV4iQmpilpjOl_unWbZm3Ca-HBJ5P2X45wa5kb9_hnhiWh_BNXbLnHT9MnvtD2obiCFCGTezgLIxGAHQxh2uAwYZAmDZDe67cXMO8daRZtHs3mMrAVln9X0Q-ErbrAqJYmscRcLv4JP-C_z60JQv0pDbM1DifLwcZumaA9Mc4uj9Sbjy87JxR_zl97fInlQv2jvMVcfN4bp0j68HXDfJhKNE_8U15QThz2B07e6pgZUI-hEeu91d2im854TMC6Mg685n9hypvp-umbDKgZhwSFjJWJa7qDJmBAJr3GPC4clBJCRsPAx",
+          "places/ChIJPRPSKHwvdTERHHkiS0Es9PQ/photos/Ab43m-s_YWdBRG9JVcBpVeod2N0WDsFB-1kZmuuFKS1inFGmO9tBEhBk50XfRflK-uEVlkGs9cvR4KvOhN8zk3LJI3JlJYWAe5UOW76ppEfdAoEWavs3uJ3Z4faAvXEavo8oQ9Vfo80gpRnpg7hq9CaDHBziPZrAt5t7-stgK9XjzD13vclYHrmtXLRHgSOh0YQfFSyGQJ7oXf48je6lU7AgiJSh2aVa2dgFZF1FpcOGr3ynYEsCkY7aF7_H7vOhxc_ikekM-5_xEp6thvM8zk3eMeDGobr1w6VtZDO_KrPXffBg4WWjL5k2P5_F20E-6dQYpUVUEuJdcbu1L98pucHcbCf9tt2o54wwtsZGhrDgNXqLuR-Klmyuz2eSJYVmi6z9S_P_IxvpqQBMD5y39c8TZDPXr4eLjBda6nn60f-HDL_IvPCYL737TaC9Y-Zylbru"
+        ]
+      },
+      "checkedAt": "2026-06-04T06:15:21.916Z"
+    },
+    {
+      "id": "ben-nghe-street-food-chijsy3r1jgvdtere51ytwqzbpo",
+      "city": "호치민",
+      "name": "Ben Nghe Street Food",
+      "googlePlaceId": "ChIJSy3R1jgvdTERE51Ytwqzbpo",
+      "previous": {
+        "address": "134 Nam Kỳ Khởi Nghĩa, Sài Gòn, Hồ Chí Minh,",
+        "rating": 4.3,
+        "userRatingCount": 12658,
+        "priceLevel": "저렴",
+        "photoName": "places/ChIJSy3R1jgvdTERE51Ytwqzbpo/photos/Ab43m-uV8jodO8Hthu7ChpueRRLOQkjunRhluvv1fEPH8yuanP1ymbyRZAMdtZmyXsn8AwmkG86_haaYjtTvN7TisQra67n4tpiCqDBBaw4_lfLa4mXsppMPx1b0Vxik7wzJqq7HNXztjr1dNJl7YWVosuXMkZ2A8MFuw5CYRT1Ox_aDkt7bJeZzM1UOINVMJFGp52MfgneDMp1n_rIwDRJ9ctvkfFZr240O6EIm5ZdNlJ2IqlswL28NppojSjjKs8MBhn-HCHgx9xdFcFO2Npgi_OSSeRgBCDMtNi7Yo1pzaJRk9w",
+        "googleMapsUri": "https://maps.google.com/?cid=11128028587886157075&g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA"
+      },
+      "latest": {
+        "name": "Ben Nghe Street Food",
+        "address": "134 Nam Kỳ Khởi Nghĩa, Sài Gòn, Hồ Chí Minh",
+        "coordinates": {
+          "latitude": 10.7773167,
+          "longitude": 106.6977562
+        },
+        "rating": 4.3,
+        "userRatingCount": 12699,
+        "priceLevel": "PRICE_LEVEL_INEXPENSIVE",
+        "googleMapsUri": "https://maps.google.com/?cid=11128028587886157075&g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA",
+        "websiteUri": "https://www.facebook.com/streetfoodmarketbennghe?mibextid=kFxxJD",
+        "internationalPhoneNumber": "+84 901 262 830",
+        "nationalPhoneNumber": "0901 262 830",
+        "businessStatus": "OPERATIONAL",
+        "openingHoursText": [
+          "월요일: 오전 9:00 ~ 오전 1:00",
+          "화요일: 오전 9:00 ~ 오전 1:00",
+          "수요일: 오전 9:00 ~ 오전 1:00",
+          "목요일: 오전 9:00 ~ 오전 1:00",
+          "금요일: 오전 9:00 ~ 오전 1:00",
+          "토요일: 오전 9:00 ~ 오전 1:00",
+          "일요일: 오전 9:00 ~ 오전 1:00"
+        ],
+        "openNow": true,
+        "photoNames": [
+          "places/ChIJSy3R1jgvdTERE51Ytwqzbpo/photos/Ab43m-vcgbqxRdguYWELqauu2Whc9WMEJciN5odjHm8WW1PUXW3-quGzT0ne1lWStXki8JMGf_uhv2rR4kXIDevXQ7SAuiPH8AsQHBGmLDA0uneGT8Y16sb3QOed8n2EEwXuL87Uey0LNkMunIoY0ThL9XPpELjPV9zqQozoDssrjq3CidqhOOZyl4uO7UCD1sci3jiz7XEe4j60ddkF8Duv7Wa3ESvyy5RdhF8juSEnYIP3T5YUe-MDEo3MLbej1P1de7Z72vV4Y4xV9NZPlPcxoHr-NyO57ljRIB6frfvMWzuCmBdqTXIvUx83gn5bKbee4Ks5FqPaUo6peRT_VRxXkNQSwHvbQ-wJdYQ_7iqfqLpwj5-5nTqt41Aq67OJ2o0d_aSHjdDxEomMlVwF3OPJWRL0tyIdBL6kCKXcfaJWNnmfvBMF",
+          "places/ChIJSy3R1jgvdTERE51Ytwqzbpo/photos/Ab43m-uTN9CKW5TaGcWBSM-zl0E89NpnbCHe7Aik2RQg5zEw5ACrL5S6S_eIf-8XOUVgrKts-jfA9uZP2qVaC8cjZKX6SqXf98pEBqmJsFyJMK2U8uS3U7pg6q5kBzikW1l9sJ_Z_UQV-UaS8z30MOpgLQH29-qXYwyMdG4o4zDnIcx9DI5dZt3bZhQtBbuJj6GxhTPbmWC2-PwvnnaZx9rfh-PlvcS-cTZWkpjPD9WrbJLHaaNjhgplPPNEXtcbevWMU8UiA7W-1a3aK4kFXlpINjq9HBAZj7GEOPwDzlO5m1YKcn4VHO_mcK1g7Zj24U1SGaKL4MmSZ6_aN9V-547yzJ8-P-QWk8_uMCKu1iA12SSpEekyulW8xyLJ7CPz-Hst4D17anTlNLENdilKWwBUmgMj3mbuGOSHXsdBv2k1zFPtc5oqdvaclX9TT3c1KBcR",
+          "places/ChIJSy3R1jgvdTERE51Ytwqzbpo/photos/Ab43m-s-DGGHV-BKNK2na1WRrCLPJSuKxcbR4yA_9sz-qugfG0wwfzG62MmYWsJhMGRic3YOWFr9HeCDLgfqxdwggV4J10-FvIZfYfUvJwqtAqYb2yJp3QK81bDeo0GDbaNBhj5tUYSBifwniSsbNOSQq2v2MeO90Vy38gKqD6k3YQ_-0nJao8_W4XJOaIdAlQxSqBi7btzlnuKep4zcLOrS3SqbsVOLy3sm6wfKWrnpx6R7LX5NcMRAXTnUmHF-XFAELCD3XVFwscWgXTPLpPHPOBNfqRZFX8-fcQE-7oIdAwfKKO5-YOjli3kcbVUQvSbLEzskXMzEczC-y3NbuvcZGDbQ10cCaiP5aqnql4TDbezbHTk9e4EshLFiRvguNANbm1vVxxC2Fb2ehYa091-4aVc7DFBu2oJ2U4LwyMNFIkGKF3frrKuamn0lDJ8sYVdH",
+          "places/ChIJSy3R1jgvdTERE51Ytwqzbpo/photos/Ab43m-sl9NbOcSDTwZtH0a6gIcatXOT1I5GRglkYSIX81dmAskIelzH5uVGrGj1m-vN9U60S1u2QqaoKMkKgJLrt9vtPrJZekRUgg8VErJ-tYuP61ujQvRKC42ryWcgN0J4oRWXrqrsicC85LBjBokDDAm5wIVCTZoVt4KdiHROSL7V40SqGsc5Li_8xLI4orjUL808CLQ3JDg1Fsb7nvE8HhFkE9ornnKSg1NPghYiI_m8lx2wmuCe2HmeluvC-0WgaIUjFpquQKLhykFX_Gc8zXO3GkXX0mKrjMV3KLdoAPR6wzVnUkffg_ORVMcB0c2sSb5kWyhmebfKbglQWEZDCa940AKV_HfliedI8icH1ch7ohxkBCTx0GNKipReAkQa2JxaClFNm2cDlnixhNQDXNPuGp7hLoUhmIc8dPN2eThYvVQGFfu5XIslme4Hf3rTm",
+          "places/ChIJSy3R1jgvdTERE51Ytwqzbpo/photos/Ab43m-u6KVKZci9HAF65rinPF_GdpbgvrO7cNDk5vdYifdlG3zK-hj20tZpHfbn6qE7jLZFjUez1EQfs64q-labCQ-qhitCSgTHJBmYQ7hhBDYKd2AhGH_EBbvTwKI0OoXd34VpOaqb3f1NqtRXlzre7Q6PhZAqV_bpXpsG4hSryGLxMxQ4ZZNqwuDgAs3Wt1s6sSNvn32D3RrGqCifDz0TaQCTrXn6TdkfRARfhGlw-plzjV3RaXhArncuRg8hov9H1u4cVF7guipYiIZl9TXbosT0HKHRmYDZtfIRHuoTMYnruk65YFe--OQApH3V6zOROZbmflQuMoXSrd5dLGOIs5mTnYOg9g51eskCxsIibFe15z_g3JK23PCmhHLP_IV6TTLhWNoEctSTsmlhb7Ipfv-kIXvn_KGPXRnMGF4h-tTSIbH9iM088qfq_nkuaEei_",
+          "places/ChIJSy3R1jgvdTERE51Ytwqzbpo/photos/Ab43m-tVNH65CrQTV52RCfzY7VEBEr-J_b2haRX_ffQu0axcfJTEuwacov8r8vIruciY5NG7Yl0asoW4NY8r5jE3MZ53Lo9W-AawCBJIIsAI_yYEkZgr_bXh3x7A0KdD-zO7ENw0gguye291TncEEs1brzPxjRao63sHKw3TI6Adqgwm8A0TfypJtKcVzdOmY7oy61zuAFHgivAUlLhZtjY9Bs1Fhu1QuLRzJDSvSkzCj0_O1hn7BQ9KJ93u1MMP1OJDwTFkagErrehhzj8SJ72dqjoGie9SPrRMU-UCg2U9NHLM-oskblolawoDwVZWYFfnhK4glzxlkfR6dGYjwdGn8SN2glv7WxIeOxUPxSCIBBKJpvOOZUXcTIoXseRgOucgZa1EQPFWWKJEziH6RlDCZUqKQbWD7N3oS26i_MV0_OttL_8oyYwGRalOoxm_za0e",
+          "places/ChIJSy3R1jgvdTERE51Ytwqzbpo/photos/Ab43m-u692qGUS8z809iA7jUKWylQ0MsGXAGhY_WEOFV238KYcCOMDaf7yd_t9ARj2PguXrgIGh8X2O-8JF5Z-6WWpaPt4qDZaFGXhTS8WSC2awtsXaz_k0iPqrQMIY8WWQfMLnXfNTwmcaZtp_4KowieXxjiPm9DwAn6c1G5d1IJx1IdRXPrUn_kfUk9oQKoXUhnFlYhx4r4QrMJWdjYWNMmEMCbvIA4fqbkXpGKUw8YnpAkTazOqX07UEAW_J7qY_P1USdtG1OV34V9t_Yy5uyQwHUKpoxWCtx8PIjWafnOuxKeZIaLSvgCmU64W4R6CdzJyuH-_QWDlyHbWwrks4LcFcvpb0pxkNH2t-5yWRDXWx7hPlbJR5pFMekbvoSijQ2-1jUMNz9Tt0tnPm5RzWsyqG3LPpP4onwnZyFsK4C0C8T2NvpjIYjeOkdg79Zqw",
+          "places/ChIJSy3R1jgvdTERE51Ytwqzbpo/photos/Ab43m-vjF_aLjRmWjq5L2jKp-wQj9aEa0ldOWmJuvR-bj632yo7OOw6v-S0lOCfLLjp1pVJ59aXdDHQ2OHiEd8OKHdmpfbpVHJ9vEM8gpHrkndB9PIO47U7lq-O0LOZFnkbkDJfXLyFlCFpBci6Sxw5Ms2YM0dUAe79DB8zVG410I5ik7yA0dNBvechD7dJQ_vw0hxH0AQ1p7oWx2qArhTR3eDofBhfq7WdL3Cx0HaFbOjIRNwWhDhsuSVvmdJxAVCxdlskiY4LPa7br1sQYDkhyaBAI0AtHspfCNmVqpllXxkDQ601OcUtg0G7DNCMUzT5fh8k-xkWdTQo6eh_t4N8ggSUQIbAS8dIUjozeSeSrvkkqIayhVp4ie4meSMBQBh7J55QhIRlQatuDUNOH9HHvt8we4cNuaNc5ifw0cTkmzaSARXlNCA5BNKlfRLhh9grZ"
+        ]
+      },
+      "checkedAt": "2026-06-04T06:15:22.224Z"
+    },
+    {
+      "id": "de-tham-restaurant-vietnamese-cuisine-vegetarian-food-chijfw-isokvdterz5z42lgtx1o",
+      "city": "호치민",
+      "name": "De Tham Restaurant - Vietnamese cuisine & vegetarian Food",
+      "googlePlaceId": "ChIJfw_iSOkvdTERz5z42lgTX1o",
+      "previous": {
+        "address": "258 Đề Thám, Bến Thành, Hồ Chí Minh,",
+        "rating": 4.9,
+        "userRatingCount": 11844,
+        "priceLevel": "보통",
+        "photoName": "places/ChIJfw_iSOkvdTERz5z42lgTX1o/photos/Ab43m-tU3zBQDcS-7yy_3LmW9SRfmjEKXjsbTLJz1skFkCVTPrYnbehdaQnN49dmF8Mi0SpbJ94C4JFnWEZUAkRYAKeNCgnEsbKmMmTDq-EujWJ0UdeCX2oGBdcN6OdxhMdeVsmWKqzjkB5CqIwymcLGCdyLG7qlYoQAoY0Xq6W17p5Y1DzRpiBFwixUjE040QUKiC0vJQoNd2Ih5bxt_w3WO0vyHVAIuoMgEqhOEmlA4xPYM6VSNR8oNFhRISUjKBmxFyDg5LN7_ZfxqiYFcCWeGYfzHMRZJQ9izO3ceKKcsjTuNA",
+        "googleMapsUri": "https://maps.google.com/?cid=6511944858552802511&g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA"
+      },
+      "latest": {
+        "name": "De Tham Restaurant - Vietnamese cuisine & vegetarian Food",
+        "address": "258 Đề Thám, Bến Thành, Hồ Chí Minh",
+        "coordinates": {
+          "latitude": 10.7682442,
+          "longitude": 106.69363039999999
+        },
+        "rating": 4.9,
+        "userRatingCount": 12087,
+        "googleMapsUri": "https://maps.google.com/?cid=6511944858552802511&g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA",
+        "websiteUri": "https://dethamrestaurant.com/",
+        "internationalPhoneNumber": "+84 392 337 058",
+        "nationalPhoneNumber": "0392 337 058",
+        "businessStatus": "OPERATIONAL",
+        "openingHoursText": [
+          "월요일: 오전 10:30 ~ 오후 11:30",
+          "화요일: 오전 10:30 ~ 오후 11:30",
+          "수요일: 오전 10:30 ~ 오후 11:30",
+          "목요일: 오전 10:30 ~ 오후 11:30",
+          "금요일: 오전 10:30 ~ 오후 11:30",
+          "토요일: 오전 10:30 ~ 오후 11:30",
+          "일요일: 오전 10:30 ~ 오후 11:30"
+        ],
+        "openNow": true,
+        "photoNames": [
+          "places/ChIJfw_iSOkvdTERz5z42lgTX1o/photos/Ab43m-vLfzwWq6bZ1vN0X3KuXehzQPTH0Jjhe6D4Ihl8t5L676dG5D87BQTt30MXsjqATZCBsgPomSS_-sgdiDBRK68hHletKXzw75n27c9lwYNzm1kjT7rmgAfND2ZHzfo6qq2M3yG5H92fHE50uLpRtxyfdBHllAb2bu1MX0o4y7mERanq_n5R6onV3n-eeU2bOfIyyv4kkvpmCT2nXngg_MMk-u9eWbXpH13xec_Cfsxera355JWGxyyCJ6rLkXZ-X__HuMsZ00mcoAGubfyBLMRCnPtDmGdRhtYrjtHe6o7Ga9csCd8Ql1qraCfkv2ShjRliCDNMszTTS1uesB6ZRTiCVjvdstmvkJ19a8lZIdTp2cBQ3Zr6ZjsAy7mPBzjwOuId04MVycUrskWv1O4em80El9KjfviF2dck8sI2nj8dMw",
+          "places/ChIJfw_iSOkvdTERz5z42lgTX1o/photos/Ab43m-tKs6T_csEP2jVrjDri3UfFPHT4phR6ptArpsriFpAP3duGrDlO6hKaOsG0kut8y3Gp7Zp7Fdy9XITxe7SZn3NU6YsauBJeGUccGKhO1Pez1Iqv1LKx8mX4gcxhAA-icEGtOkdAJ58MqKD6iXy81pXya2DrPrhn_5yLIUNWF4fZMhmIMWzg_ss-iUQjl3lrTJRfTrNEy3bRFlf4OAEtIeRqMoC-Oqh4dXUVaiAP9uaHma5eurGkIFYJAtfJ3nXUxjwNii61bt98pkZ7tbWPQt0ljGAnP8-TqsxzxcnFU0DTnNOvVGuRKFk4z5Of-aXUJs7h2roQrCcIkLipYb9UyBFHzylR3egyrZEuZceLS4rO1Jjud_Z53Z4txFcG9_0eWc6PUvNciNnb3PKmlIoKuPXJ1GyGlGhoHLeTy2liii7PWXgn2-cUIBBw33cuSYoe",
+          "places/ChIJfw_iSOkvdTERz5z42lgTX1o/photos/Ab43m-tolQg5ziCUxGXBdfBbqriVjOxVNyy4YsURzudogWl2pZXXrUbEq-dNQH5yT9eJud0XgAL96nEvIqs5w7fISp2-CKMHfZ9ZJKvcf3v-P-3wfbt2rnjC-IEVsGjX56I4s8u_4mAHegbXTaBLgXPSI4q5SamoWeBWs-gtVqzgaQ88mH00MOvt1b2niBh-rh2VeyvjGcPNFVhpxWSXRYwllA7twBpLE0v4mLtYrm1ZU46QfhAFxlVTbv_sLjXfsvdwIN3uXwicQoStMz2yLuWXI_Igb-ZR2Z9TnDhbrfb05AG5FUkma2JDMg1D-xjZ-bmmerhrIKL08NCQ3E6Tq00Fs20c0b77XK2X8fgrrbyQkWBGWQNnZSyUKrJ76l4mQHbDrLgTn8OkluSN2niRoHi68NuAGpxCcwBAAQzpRAMECyu0e82GNmDazVvlqVQCiESY",
+          "places/ChIJfw_iSOkvdTERz5z42lgTX1o/photos/Ab43m-sLqLdkswJ7VRcHEHP9kmqj8HZHzpMcmE47hEkf9OPOnG-gv5FLqS5NEr3ecu1ZQ8WttPLbbLlsM2Wev3LlZ-F0veBv0T-Cy05bzwiR4NCWFOEP-RZlbEfkkTpel9tY-dsnlwM7HkMwlkTnsDt_BN5Mf5Cij6KIMtokMyLLh9IRQoDwfnxSDkZVn-67_kRr_ZFXlzLZ1UCr6iacxu6-zFmZQ346Dv-PKRA4a3fQ7uI2dyWaRBXUBAgp1KdfLTeCWDh4HUGFeJxgpVfQKmWg1DlayGF73D28YpX37J14A2HJAnSjQx5FGsUvyFhuuI57tQqWxr80AuP51SKVm78RvZW_SXxokRNhuNhARoM7CRBP5a93sofi5VZBZf7x7J15TSyOB0ljkzsP--eXVuJcqpUjeSPO2z9r2Y1BQdQF78qNtJebfpY4PGy7i_zjtVBn",
+          "places/ChIJfw_iSOkvdTERz5z42lgTX1o/photos/Ab43m-tnl87k5Qtzibo_Y4AhHkhFSu5UmBj3NMtX4qQXZUKGlTf2ngpqB9RwHd-7rer3KceqNhy92jtE95eJQ1fprnGOPhzP24pXWOFm_VRbtrbaU-FJ6u19CpWHSa2w_95XsTwqvuE2fLpietSPIQGuVyfxiJlaSwpPvhVmFqxAeyuV2fDxpVKLdiu1bRWw5Vmk-5iygQ-bYRg6OVJFS0YYw_N6QpMz3e47mSKL9OGukIjlRbJ1exapS0jk93LhZHMdHxHCHeOPCeokMEFUFU2QxZPcCdB2ZzuimwUoGDGF6CnC5mkmUDSB-ofUqEx6ph7aP4tL-sVrG1l6zdcNpFcSA1KW3qwfKa5vnFyLBdGBw_5pBQDww56zGpex71xNU6sOrjQJM5dqUFsV5lVEYhlkp_tEJFR3v1nSoZBz-qlB-MkhluPe09iSUfGVrZvyag",
+          "places/ChIJfw_iSOkvdTERz5z42lgTX1o/photos/Ab43m-u6apVaqgrMhlQYj5oedjcE1_qWLmKjrsi025kagpdc8nyPGvGVNpwEy9HbT2ThVQ9mXfaIiuct6hsPTBIVXWRoAVtcWQRM7ZNQOcXXnYm1R-tXWGptgZs7iW5728LULfYerkCCrXJcb3rnF_Jd2UoKQ909kVQhoUD7NKh_74zkjxP3qNcsUorlMibBFbu-wa21milmrvFoF7JNw2yoTxyKZFO9XGYyFc2S61h9Hsfyr7-5XTEkj7GfEgEbxzUTUXUY_deVqD9fosrnV_Wqhlf0dDDx92yOaCW2KRNNKKvyyAjWYtA4qNXpCVETklxZoh_d_wQibCF2ty-gxOqbxnZoOfgvr-unSCiCEoakNT-hWKN5qDhk6hWmLvJ6graiUuJPHtiPnH9Nc0k7Wz46M5gLE9znKb6CXF30VX8KDrn7HRzKRE5MWw4GpUr2M_1I",
+          "places/ChIJfw_iSOkvdTERz5z42lgTX1o/photos/Ab43m-vZM7kY5o38jUEjW_NW7QTCiI5KRqW4QJO_6JpdmvrXlnEa57hUv--fk7G8bmnYQop-xW9j9qHXdo80fCo5BMyHVqm3m0d7EVr7a4ThtZSYdQTfuhksUhEEeXuzV3cLiERD8VzfWMUqCneK15OjtLBFVgRSWNBWxJgoRuOAIjKxnTgRfoLQ1Iz83lsWVVJKOouygeftIxaai7snTKHQKHOUMeow9qxZP4-2bU9mm4ZysrhzdCEdq3ZYzow-gn5qvKVsD1m1eZn5M0bnemqH-nuWuLlUdu17bnrvovm3chfj9QtiI8KDv75L5-QMbnpp5wpnqTVoZDEOyb60jRBT78H4hwfS9gwHqGXbmYRGvVNoAAi8_K3DcV_GXv1Xohvv1_1Gsygjp-K4H9hNG97iOWv8Jv60L6e48vdmAmDLkUH60493Vxk2x9virf-m1A",
+          "places/ChIJfw_iSOkvdTERz5z42lgTX1o/photos/Ab43m-up3VQp77il-hQkdPXK7nSnzSzm8z9GiTAQViiB2IcwXz3bZPgumRMZMxG_Fta55_n4jyjNSl3ARr7y5WL7q9EFNnmMlN4v3L41a3G3clV-rI6bWPPfal8Fk0i9GIhfISjSAK7WGFSeMq1xQcWBDyMcrYDXT4fnF7-jTypUPT2neZXzotIZ8IS9mXLbqfQrx9-9HNDhZu2YTtPPNd3biuDR60SOH3AQsqnuFp4q58UiNZkHaU-7uQPi5nhGDTGu53XvP-BrQjchsBq6aVaNtqXldV7i07CGFFoBgtJQPRo6wppE7ME2ltLOdPQhc-1LQX7CRDxEvwwumxFciJSt6D6NNRAKNQi-4r03meJaEQ78aaNje1cMhjAZgOOWKr2R8WzTO6Ym-UsEaFTwNgBU7gvfBDqiKwEF47xgpWVU-mSi1YPl99o32NUNVnts4w"
+        ]
+      },
+      "checkedAt": "2026-06-04T06:15:22.299Z"
+    },
+    {
+      "id": "tung-s-restaurant-vietnamese-cuisine-vegetarian-food-chij6wdc4vkvdterwud-c4m-pac",
+      "city": "호치민",
+      "name": "Tung's Restaurant - Vietnamese Cuisine & vegetarian Food",
+      "googlePlaceId": "ChIJ6Wdc4VkvdTERwUD_C4M_pAc",
+      "previous": {
+        "address": "230 Lê Thánh Tôn, Bến Thành, Hồ Chí Minh 700000",
+        "rating": 4.9,
+        "userRatingCount": 11844,
+        "priceLevel": "보통",
+        "photoName": "places/ChIJ6Wdc4VkvdTERwUD_C4M_pAc/photos/Ab43m-sS3a7LF-eMl62nFKXiput5oggUsv3Zejf2inFD9mauabbdYKIDad7YOICkds64ONFSrssq67KLIKu4ejvT-7efaQqAxzdrmbT2dd9vLhRoqp2_qsOAW_wSsWxncLsWMmzzifMxOf-3WIEYhKDUfgaIRMVDtawqAnz2QZc_i0TnNN1zejquSlFUvl4iRWfZNqDEfpqX1s6FIrqIRi5OJc8pCkLxYuVEaw_P7RMvCqa-wbY75IhjcZVZ52KvKKJChhy9Wc8KKhd6-G9oDI_CPbwx-RZi2YOfl9c_hbDR7NddQg",
+        "googleMapsUri": "https://maps.google.com/?cid=550634886520586433&g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA"
+      },
+      "latest": {
+        "name": "Tung's Restaurant - Vietnamese Cuisine & vegetarian Food",
+        "address": "230 Lê Thánh Tôn, Bến Thành, Hồ Chí Minh 700000",
+        "coordinates": {
+          "latitude": 10.7725426,
+          "longitude": 106.6964818
+        },
+        "rating": 4.9,
+        "userRatingCount": 12100,
+        "priceLevel": "PRICE_LEVEL_MODERATE",
+        "googleMapsUri": "https://maps.google.com/?cid=550634886520586433&g_mp=CiVnb29nbGUubWFwcy5wbGFjZXMudjEuUGxhY2VzLkdldFBsYWNlEAIYBCAA",
+        "websiteUri": "https://tungsrestaurant.com/locations/",
+        "internationalPhoneNumber": "+84 916 235 230",
+        "nationalPhoneNumber": "0916 235 230",
+        "businessStatus": "OPERATIONAL",
+        "openingHoursText": [
+          "월요일: 오전 10:00 ~ 오후 11:30",
+          "화요일: 오전 10:00 ~ 오후 11:30",
+          "수요일: 오전 10:00 ~ 오후 11:30",
+          "목요일: 오전 10:00 ~ 오후 11:30",
+          "금요일: 오전 10:00 ~ 오후 11:30",
+          "토요일: 오전 10:00 ~ 오후 11:30",
+          "일요일: 오전 10:00 ~ 오후 11:30"
+        ],
+        "openNow": true,
+        "photoNames": [
+          "places/ChIJ6Wdc4VkvdTERwUD_C4M_pAc/photos/Ab43m-uhDmaYsvFkcVnymMmAGo6XwSNLBduwwwDFqXfzWpGXp_XtqSxghIL2S_6icYJK6FvWygb-CsOVDMaygWdREALLZ0XYTfwzhjtFO4QSg0Sus_xo1eXSg5Avkgwkc7L5gj1KhsO2Yo7VMyZKbgyHyuEPc_PaDOcsiUlFdjg3KQBAySTDUY7WAB0ZUjp0OWWJUtw8uWjBvc5uNy2y97Cnyesb3oKAJnrSR3SspDxuQ9SQkA0OefKjYz0YO4oApXnxKtbag5Qyb43ZQYMhxn4QPSyd3uTAhNqLrq6Iv73K-J4Mar1MDsthVF4cOVLE6w0eyfZ57d7WizY1ebdtDob9CTSPlzph7w9bxrJqYFaIqrNl73l3v7Pge5EWN1nSjZeUuyDvI7cn8xKsA4MoLM1WFb67at-vwviGMAPpGZxvq9lpXZ9k",
+          "places/ChIJ6Wdc4VkvdTERwUD_C4M_pAc/photos/Ab43m-vOZCGn22OfKl-qunF0wjJOgMuxzdVSMyx8x02Emc92NMe2-vt-HYxWKnXKSznmyE1FqRpTQYLmuiUiIxP5jCTZ4DXQfoQW2kDTC8Z4ZfyEb-jC0jeiorM4TinWimtALzWzXIuAk7HM-sda-2hSrA0vVQEEo6J2D8vJ4TkjxwmMyneO2fRNfBKH9HHLbrEXAmtTW4iSrGU6s3TtBu6NoFEkfV5cjduT-Q5R1paHCJM67Q-1hpPe-InNGam44Zk5TgJF8DjbqMthWm88sncacfKybsNyiIgunL3QwW-cntNyj213IRzHm4E6SWK5anxpArcoTuaLHyi8mn2BGGOkQ6E5w5nv1yUCpS7PqZtEm6srfA-Grw5UR1geJguiIlVi1mtn41UqWdNKj0emtHF3VJ50cbH7NmbmHh_HPtBB-IYajZw",
+          "places/ChIJ6Wdc4VkvdTERwUD_C4M_pAc/photos/Ab43m-vw_gclgD_skRhiGZCCw7_o7-UXHJz9pmkMVd3_xbBwt-AkzH1BZNtqOyONY3YpCNOmSfOYF4FTxELTBjZgD0OA_iMLZ-nFSdsCJ8boIQ-491mTDyAtzqG0zrHzCk92cRpWYEllN3aqMMYD1saZJroiToZFqPQ6kh8ukj-hkbRhKhKQ-NiNhFwNhsHQuANGajMlaUJQyUkALq_fpeG1nx2nTdaVK0dfGadSZSs7CkmsAt7Ck8z56d2gNP3uyryabN_iv1DHnO3XnOWVeKpL_HefDXOshsxbeU-qtBhMEA3b77dBvOkrBKZBIq0TTyvGwunJvgoDBlbVGNnicEihREJx0EzH7cB6tn8blNjX2Nx__7zUDzakDBfJg_jUFXMp02ORp1q4GH7BXGK1EPMjcM6Pr5HisSN7g5qHkH8HxhAf5XBX8KLNSnDEmy610aDq",
+          "places/ChIJ6Wdc4VkvdTERwUD_C4M_pAc/photos/Ab43m-ser1mT6noLD2hazxH9s0FAWv-Ugtq1pel9VTDoBFqc-yrhQlCV0h-hWlXuysTeOgBqdhWpCXFL94wKEhhvZIPVi19GcR69DUrDWXnlGpL_Nl3tyvManvYetH2MOwcDa-bw_330H_CPV6CXql18u3qOFi8n8eQVp4GRYufQnpn5nmISlsEmyb9CLAMhstLWnJSGdyWyogWUOu8-KPT6lYxrHfqrz43cm9zxpLMF_Xb4k71q8BfiiVs0doUlqt35Ftpd2qkwIrlzB2jBo3dvRie6JT3wq7rVOeaSxd1KOidhnL0hRGIlZvnVyyNJrHcuQ4ItCCRs3cx-j3WCyunMBOlTOgPyE0Cu8cje5uhb8WMe9D5N2Pusz-DtR8GmryUXChablxFk8DWZXFCWC7WCT-89nsSHfgous0p2rtDrI6QonxlxOQZsW2md7IfkZg",
+          "places/ChIJ6Wdc4VkvdTERwUD_C4M_pAc/photos/Ab43m-tJorxpSOQx-NXqP4Fn3X-4-8CRzQuPAi7WA2E0VjQYi3sdssdFx6-qXbmQ7h_zyZApbJLApvgvXGQdKbZasC0I6FUzvoLZCrQSrn4cOBICfjEE_IRkj4M460PuaXmRsKAUVRs_kLHoqjeaVLDsgXmqR-5JhzZI3vRbQWJBunJZ_HGk8qi4PxCWBktJ8s1X9SbVl7RvBhQ9X51pVWpuTnEIbFxlboN369JbRtnxhApVrn9M0sk9bwgQfpMOTuU2YpU2GiwFyFzULv4Vs4iZp9Fp-zjc3gmD_eSXS7bRnqdrfZKRlsxG3NFgDmP3YQZFOdsuw0pUPrg0mk0yX9jw-GXtGXr9MPY_U3SxVQ1bh74NptSZSA0OrdVjOtQANCJYbTMuBmlYSWoiZIi7AO7MsFB-V9uRDR2Pe1pzkeTUs78G4vgDhBpWt-7eDq6ajxxP",
+          "places/ChIJ6Wdc4VkvdTERwUD_C4M_pAc/photos/Ab43m-t1aHodd_yGVR1rTPmeiJMQU4onEtd3wa08ZOvCnNGj9MOouNOB9LEe4kG2VwAS1k8OXyA7zlojGHHX6BeYXmyb-rUDFUa86PGt90S35PnwtG-11FWJ9Froh9gBAFcmEciRr1ahS4yNEjj7svuIB7trkj2jyyHcSY8QjikfC4JWcI7C7YcXNfdTbutAkWTENISALSnkf32dn-M2Ttdb6Y4erGQCgddONFkNxGhCrVOt26tQnqOkBoFYXelhbkhDN3Q0SnZXLbNW4Eqd6AwfWq8mjFm0eTzfcgrFYK4RBtTlyFajk5X_k6-U5z8d2uUq1y89faepRb16j3QRkfaFApdz_oxpDSYX7MLUG_YfPHzTxGzZZKxw72qYCluH9p7M_0kiT5XEEHFFjrSORYNmqBAdySbjjcNPBQT_L8xPrgQ8zxIFnxX9scwu_69HiUuP",
+          "places/ChIJ6Wdc4VkvdTERwUD_C4M_pAc/photos/Ab43m-tE29c2R2IK2WNmZsfwDWu3q98gONj-JlcHH2Gu5_IIxBMEyXhVK_JlrMAqMSOGbBlagjdYUAVPqlDyufWfM9CyS3NLHcGRhDgbjaarv4WI7fM7uv_94arfzQblGbuI4QXqTw3dgGyhdqwowSmWukjCJf2-DVhr09eV6jUla6gQyjtlPAt4_PhO6LvpfORr7Iz_tIKUfHQLiUledhiymlm2IK5inGgyKJNoakoNrooC_ZzwA4YM_Vm2hGONMBfFt9OVB7x5bFCR_ihTOrWxjAXULzXTQN3yRbQKOr1PSO-kYb7kTPAGu311rSnhdieBxPcbedAyh-U8jaMIVVo8_nhFEQ_2DR_Dhj8Pj7ujI9adoshwHu-q6y_gldFsq-PF6WtQaSc8GcF9AHQEtImdt8Gd0_IxFKjHZf7tM_XJGwqVu6RQ0pYAWcqd5Mw461Ts",
+          "places/ChIJ6Wdc4VkvdTERwUD_C4M_pAc/photos/Ab43m-uwKQeiuQM1ILwjV5_PdFL7AcIj7VYUes6KeYdBPfQAaWqcSC6JAHDmQuMNmjQLE-uDxtjgdsdUukF6yzqFJByIJpL7n8oCPqghaKLf4g03HR4oagAMwQdm8X5ctiV98wD6nP48fyXgnuZ2c9f0KZ_Mp9P0i0NDkNjyLZ3MAgtqLV2nl16cI-mHDycV8Gl-OL8olrvqIzzHFcDdHychm3MqRfAuMYdyNcK2VbdVOlbNUg-uS1ED7VFE9Jk-j4WHcmukvwFvMHe-wS9gbMv6EEZhaSXAzzqCsUSpGItZm9ihLiHyNXVnH9zE1CLTHhABr6ptTZQH07y9MpA2PFaN4ruW7iwRNO3U_wkkQKKZgTATcIDGQImN30yVV_Kd2KbhZkN5dbZkchq_Brif3j-q8aK_aVc6oAh1Z35oF6beoHqPzPRN-FCp9LWLCChFwQ"
+        ]
+      },
+      "checkedAt": "2026-06-04T06:15:22.425Z"
+    }
+  ]
+}

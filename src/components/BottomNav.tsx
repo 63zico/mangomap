@@ -6,8 +6,7 @@ import type { ScreenName } from "../types";
 const tabs: Array<{ key: ScreenName; label: string; icon: string }> = [
   { key: "places", label: "탐색", icon: "⌕" },
   { key: "home", label: "지도", icon: "⌖" },
-  { key: "travel", label: "커뮤니티", icon: "◌" },
-  { key: "marketplace", label: "장터", icon: "□" },
+  { key: "saved", label: "저장", icon: "♡" },
   { key: "my", label: "마이", icon: "●" }
 ];
 
@@ -19,36 +18,43 @@ type BottomNavProps = {
 
 export function BottomNav({ active, onChange, badges = {} }: BottomNavProps) {
   return (
-    <View style={styles.wrap}>
-      {tabs.map((tab) => {
-        const selected = active === tab.key;
-        const badgeCount = badges[tab.key] ?? 0;
-        return (
-          <Pressable key={tab.key} accessibilityRole="button" onPress={() => onChange(tab.key)} style={[styles.item, selected && styles.itemActive]}>
-            <View style={[styles.iconWrap, selected && styles.iconWrapActive]}>
-              <Text style={[styles.icon, selected && styles.activeIcon]}>{tab.icon}</Text>
-            </View>
-            {badgeCount > 0 ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{badgeCount > 9 ? "9+" : badgeCount}</Text>
+    <View pointerEvents="box-none" style={styles.host}>
+      <View style={styles.wrap}>
+        {tabs.map((tab) => {
+          const selected = active === tab.key;
+          const badgeCount = badges[tab.key] ?? 0;
+          return (
+            <Pressable key={tab.key} accessibilityRole="button" onPress={() => onChange(tab.key)} style={[styles.item, selected && styles.itemActive]}>
+              <View style={[styles.iconWrap, selected && styles.iconWrapActive]}>
+                <Text style={[styles.icon, selected && styles.activeIcon]}>{tab.icon}</Text>
               </View>
-            ) : null}
-            <Text style={[styles.label, selected && styles.activeLabel]} numberOfLines={1}>
-              {tab.label}
-            </Text>
-          </Pressable>
-        );
-      })}
+              {badgeCount > 0 ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{badgeCount > 9 ? "9+" : badgeCount}</Text>
+                </View>
+              ) : null}
+              <Text style={[styles.label, selected && styles.activeLabel]} numberOfLines={1}>
+                {tab.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
+  host: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
+    alignItems: "center"
+  },
+  wrap: {
+    width: "100%",
+    maxWidth: 560,
     minHeight: 72,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,

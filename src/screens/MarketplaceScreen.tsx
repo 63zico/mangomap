@@ -15,7 +15,6 @@ type MarketplaceScreenProps = {
   memberName?: string;
   memberTemperature: number;
   entryMode?: "all" | "trading";
-  onTemperatureChange: (delta: number) => void;
   onRequireAuth: () => void;
 };
 
@@ -935,7 +934,6 @@ export function MarketplaceScreen({
   memberName,
   memberTemperature,
   entryMode = "all",
-  onTemperatureChange,
   onRequireAuth
 }: MarketplaceScreenProps) {
   const [selectedDestination, setSelectedDestination] = useState<Destination>(input.destination);
@@ -1561,9 +1559,7 @@ export function MarketplaceScreen({
       )
     );
     setTradeReviewsByItemId((current) => ({ ...current, [inquiry.id]: review }));
-    onTemperatureChange(memberDelta);
 
-    const memberSign = memberDelta > 0 ? "+" : "";
     const sellerSign = sellerDelta > 0 ? "+" : "";
     setChatMessagesByItemId((current) => ({
       ...current,
@@ -1572,7 +1568,7 @@ export function MarketplaceScreen({
         {
           id: `${inquiry.id}-review-${Date.now()}`,
           sender: "system",
-          text: `${inquiry.buyerName}님의 거래 평가가 저장됐어요. 내 망고온도 ${memberSign}${memberDelta.toFixed(1)}°C, 판매자 망고온도 ${sellerSign}${sellerDelta.toFixed(1)}°C`
+          text: `${inquiry.buyerName}님의 거래 평가가 저장됐어요. 판매자 망고온도 ${sellerSign}${sellerDelta.toFixed(1)}°C`
         }
       ]
     }));
@@ -2396,7 +2392,7 @@ function TradeChatRoomScreen({
               </Text>
               <Text style={styles.tradeCompleteTitle}>
                 {tradeReview
-                  ? `${getTradeRatingCopy(tradeReview.rating)} · 내 망고온도 ${memberTemperature.toFixed(1)}°C`
+                  ? `${getTradeRatingCopy(tradeReview.rating)} · 거래 후기 저장됨`
                   : tradeCompleted
                     ? isSeller
                       ? "구매자 평가를 기다리는 중"
@@ -2408,7 +2404,7 @@ function TradeChatRoomScreen({
           </View>
           {tradeReview ? (
             <Text style={styles.tradeCompleteCopy}>
-              내 망고온도 {tradeReview.memberDelta > 0 ? "+" : ""}{tradeReview.memberDelta.toFixed(1)}°C
+              거래 후기는 장터 신뢰 참고용으로만 기록돼요.
             </Text>
           ) : null}
           {canSellerCompleteTrade ? (

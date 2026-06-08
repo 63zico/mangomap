@@ -1,0 +1,454 @@
+{
+  "generatedAt": "2026-06-04T15:33:16.139Z",
+  "applied": true,
+  "perCity": 31,
+  "cityFilter": "달랏",
+  "requested": 31,
+  "ok": 30,
+  "failed": 1,
+  "changed": {
+    "address": 0,
+    "hours": 1,
+    "phone": 1,
+    "photos": 30,
+    "reviews": 1,
+    "price": 0
+  },
+  "failures": [
+    {
+      "id": "dalat-lau-ga-la-e-tao-ngo",
+      "city": "달랏",
+      "name": "Lẩu Gà Lá É Tao Ngộ",
+      "error": "Google Place Details failed (400): {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"The provided Place ID: dalat-lau-ga-la-e-tao-ngo is not valid.\\n\",\n    \"status\": \"INVALID_ARGUMENT\"\n  }\n}\n"
+    }
+  ],
+  "places": [
+    {
+      "ok": true,
+      "id": "달랏foodquannuongchillindalatchij9u2rnvwtcterzkgvggh2nge",
+      "city": "달랏",
+      "name": "Quán Nướng Chill in Dalat",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodnhahangtuimotogardenrestaurantchijo9tcd5stcterag6zekt3d9y",
+      "city": "달랏",
+      "name": "Nhà hàng Túi Mơ To Garden Restaurant",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodquancomlinhđalatchuyenđen17btranhungđaochij53naelgtcterh1dtismczmy",
+      "city": "달랏",
+      "name": "Quán cơm Linh Đà Lạt (chuyển đến 17B Trần Hưng Đạo)",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodlaugalaeganuonglu668chijcqkifnyscterskesrnxzkli",
+      "city": "달랏",
+      "name": "Lẩu gà lá é-gà nướng lu 668",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodmotolauriecafebistrochijiq3o0dttcterwu80ib9xqy8",
+      "city": "달랏",
+      "name": "Moto Laurie Cafe & Bistro",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodthethaicuisineđalatchij1fjsozstcter01i4rp7djow",
+      "city": "달랏",
+      "name": "The Thai Cuisine Đà Lạt",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodtiemanđalatphorestaurantchijmzxtgy4tcterzanixs08vxe",
+      "city": "달랏",
+      "name": "Tiệm ăn Đà Lạt Phố - Restaurant",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodmoondiningchija7kf1zutcters2ysxffs54",
+      "city": "달랏",
+      "name": "Moon Dining",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodquancomlinhđalattranhungđaochijef2ayqatcterudvnuznpyli",
+      "city": "달랏",
+      "name": "Quán cơm Linh Đà Lạt - Trần Hưng Đạo",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodnhahanghapthuynhietbinabinachijtb2r224tcterwdrbser95lm",
+      "city": "달랏",
+      "name": "Nhà hàng hấp thuỷ nhiệt - Bina Bina",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodhappythaiđalatmonthaingontuyetchija7ybekytcterexhwaxzljow",
+      "city": "달랏",
+      "name": "Happy Thái Đà Lạt - Món Thái Ngon Tuyệt",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodtrangscookeryrestaurantchijpuxspcktcterqotrcavtve",
+      "city": "달랏",
+      "name": "Trang's Cookery Restaurant",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodnowrestaurantnhahangcomnieulaugiađinhngondalatbestfoodchijbw1op6ctcter1izlxz1tts",
+      "city": "달랏",
+      "name": "Now Restaurant - Nhà hàng Cơm Niêu - Lẩu Gia Đình Ngon Dalat (- Best food)",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodquancomlinhđalatsuongnguyetanhchijiwdixetcterqjeyxse59rc",
+      "city": "달랏",
+      "name": "Quán cơm Linh Đà Lạt - Sương Nguyệt Anh",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodphoanđalatbeefphodalatchijztmeljutcteraogvrzfft6q",
+      "city": "달랏",
+      "name": "Phở Ân Đà Lạt – Beef Pho Dalat",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏fooddlartgardendrinkingdiningchijtfwqqeytcterexwyakrculo",
+      "city": "달랏",
+      "name": "D'Lart Garden Drinking & Dining",
+      "changed": {
+        "address": false,
+        "hours": true,
+        "phone": true,
+        "photos": true,
+        "reviews": true,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodpeacebistrochijn3qme0etcterckpdnlvbx0",
+      "city": "달랏",
+      "name": "Peace Bistro",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodtusenvegetarianandcafeđalatchijjxnuruutcterstxio4vykoy",
+      "city": "달랏",
+      "name": "Từ Sen vegetarian and cafe Đà Lạt",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodhillygardenđalatbbqprivatedinnerchijo2wnu68tcterf0mojrgrc9s",
+      "city": "달랏",
+      "name": "Hilly Garden Đà Lạt - BBQ & Private Dinner",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodlealpidalatrestaurantchij7yoabx8tcterkbgx2v4cwgk",
+      "city": "달랏",
+      "name": "Le Alpi- Da Lat restaurant",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏foodkhuphuchopdala247chijx3d4oqatcterkn3ptsipyi",
+      "city": "달랏",
+      "name": "Khu Phức Hợp Dala247",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": false,
+      "id": "dalat-lau-ga-la-e-tao-ngo",
+      "city": "달랏",
+      "name": "Lẩu Gà Lá É Tao Ngộ",
+      "error": "Google Place Details failed (400): {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"The provided Place ID: dalat-lau-ga-la-e-tao-ngo is not valid.\\n\",\n    \"status\": \"INVALID_ARGUMENT\"\n  }\n}\n"
+    },
+    {
+      "ok": true,
+      "id": "regional-dalat-quan-33",
+      "city": "달랏",
+      "name": "Quán 33 Ốc Nhồi Thịt",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "regional-dalat-leguda",
+      "city": "달랏",
+      "name": "Léguda Buffet Rau",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏cafetiemcaphetrungcobađalatchijo8png7atcter2znicgdwtps",
+      "city": "달랏",
+      "name": "Tiệm Cà Phê Trứng Cô Ba - Đà Lạt",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏cafequancuathoithanhxuanchijw6da8tcterquhnflvgr7s",
+      "city": "달랏",
+      "name": "Quán Của Thời Thanh Xuân",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏cafetiemcaphevungngoaiochijsdskmaatcterjocxjxleaf4",
+      "city": "달랏",
+      "name": "Tiệm cà phê Vùng Ngoại Ô",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏cafecoffeeemvatrinhchijeexvtitcter2ptbrqlwdxg",
+      "city": "달랏",
+      "name": "Coffee Em và Trịnh",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏massagefeelgoodspachij92s2vqtcternoibjzhhgfa",
+      "city": "달랏",
+      "name": "Feel Good Spa",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏massagecloverspamassagedalat달랏마사지chijbe8xabwtcterwsjjn28gp4s",
+      "city": "달랏",
+      "name": "Clover Spa Massage Da Lat - 달랏 마사지",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    },
+    {
+      "ok": true,
+      "id": "달랏massagecharmspamassageđalatchijy12obxutcterdgv36wrjf9a",
+      "city": "달랏",
+      "name": "Charm Spa Massage Đà Lạt",
+      "changed": {
+        "address": false,
+        "hours": false,
+        "phone": false,
+        "photos": true,
+        "reviews": false,
+        "price": false
+      }
+    }
+  ]
+}

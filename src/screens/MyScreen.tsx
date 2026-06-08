@@ -48,7 +48,15 @@ function getAuthIdentity(provider?: AuthProvider, identity?: string) {
   return identity;
 }
 
-const profileInterestOptions = ["맛집", "카페", "루프탑", "마사지", "동행", "중고거래"];
+function getExplorerLevel(savedPlaceCount: number, reportCount: number, approvedReportCount: number) {
+  const score = savedPlaceCount * 2 + reportCount * 4 + approvedReportCount * 12;
+  if (score >= 80) return { title: "🥭 망고 마스터", copy: "여행자들이 믿고 볼 수 있는 장소 품질을 꾸준히 만드는 단계예요." };
+  if (score >= 36) return { title: "🥭 현지인급", copy: "저장과 제보가 쌓여 베트남 여행 동선을 잘 아는 단계예요." };
+  if (score >= 12) return { title: "🥭 여행 탐험가", copy: "좋은 장소를 저장하고 검증된 정보를 모아가는 단계예요." };
+  return { title: "🥭 망고 새싹", copy: "가고 싶은 장소를 저장하고 첫 제보를 남기면 레벨이 올라가요." };
+}
+
+const profileInterestOptions = ["맛집", "카페", "루프탑", "마사지", "관광명소", "현지생활"];
 const travelStyleOptions = ["초행자", "현지맛집", "밤거리", "느긋한 일정", "사진 위주"];
 
 type ProfileDraft = {
@@ -73,28 +81,28 @@ type SettingsDetailKey =
 const settingsDetailContent: Record<SettingsDetailKey, { title: string; subtitle: string; rows: { title: string; copy: string }[] }> = {
   blocked: {
     title: "차단 회원 관리",
-    subtitle: "신고하거나 차단한 사용자는 커뮤니티, 모임, 장터에서 최대한 보이지 않게 처리돼요.",
+    subtitle: "신고하거나 차단한 사용자의 후기와 제보는 최대한 보이지 않게 처리돼요.",
     rows: [
-      { title: "차단 목록", copy: "생활톡, 모임, 거래방에서 차단한 사용자가 여기에 모여요." },
-      { title: "숨김 처리", copy: "차단한 사용자의 글, 댓글, 거래 메시지는 목록에서 제외돼요." },
+      { title: "차단 목록", copy: "후기와 제보에서 차단한 사용자가 여기에 모여요." },
+      { title: "숨김 처리", copy: "차단한 사용자의 후기와 댓글은 목록에서 제외돼요." },
       { title: "해제 기능", copy: "차단 해제는 서버 차단 목록 연동 후 사용할 수 있게 준비 중이에요." }
     ]
   },
   safety: {
-    title: "거래 안전 가이드",
-    subtitle: "여행지 중고거래는 공개 장소, 현장 확인, 선입금 금지가 기본이에요.",
+    title: "장소 신뢰 가이드",
+    subtitle: "MANGOMAP은 한국인 여행자가 바로 판단할 수 있도록 검증 상태를 분리해서 보여줘요.",
     rows: [
-      { title: "공개 장소에서 만나기", copy: "숙소 로비, 카페, 쇼핑몰처럼 사람이 많은 곳을 추천해요." },
-      { title: "물건 먼저 확인", copy: "유심 잔여일, 티켓 사용 가능 여부, 전자기기 작동 상태를 현장에서 확인하세요." },
-      { title: "문제 있으면 신고", copy: "거래방과 게시글의 신고 기능으로 운영자 검토를 요청할 수 있어요." }
+      { title: "확인됨", copy: "주소, 카테고리, Google Maps 연결을 확인한 장소예요." },
+      { title: "제보됨", copy: "여행자가 올린 정보이며 운영자 검토 전까지 분리해서 표시해요." },
+      { title: "정보 수정", copy: "영업시간, 폐업, 이전, 가격 변동은 제보 후 검토합니다." }
     ]
   },
   notifications: {
     title: "알림 설정",
-    subtitle: "채팅, 댓글, 거래문의 알림은 앱 안 배지와 토스트로 먼저 보여줘요.",
+    subtitle: "저장한 장소, 후기, 제보 상태 변경을 앱 안 배지와 토스트로 먼저 보여줘요.",
     rows: [
-      { title: "거래 채팅", copy: "거래방 밖에서 새 메시지가 오면 장터 탭에 배지가 떠요." },
-      { title: "커뮤니티 댓글", copy: "생활톡 댓글은 Realtime 연결 상태에서 즉시 반영돼요." },
+      { title: "저장 장소", copy: "영업시간이나 주소가 바뀌면 알림 후보로 관리해요." },
+      { title: "후기 댓글", copy: "내가 쓴 후기와 댓글 반응을 알려주는 구조를 준비 중이에요." },
       { title: "푸시 알림", copy: "앱스토어/플레이스토어 패키징 후 기기 푸시 권한을 연결할 예정이에요." }
     ]
   },
@@ -102,17 +110,17 @@ const settingsDetailContent: Record<SettingsDetailKey, { title: string; subtitle
     title: "공지사항",
     subtitle: "MANGOMAP 운영 공지와 업데이트 기록을 모아둘 공간이에요.",
     rows: [
-      { title: "현재 버전", copy: "MANGOMAP 베트남 여행자 지도, 모임, 장터 MVP를 테스트 중이에요." },
-      { title: "최근 개선", copy: "카카오/Google 로그인, Supabase 장터 저장, 실시간 채팅, 카테고리 선택 UI가 추가됐어요." },
-      { title: "다음 예정", copy: "제보 승인 관리, 알림 강화, 앱스토어 심사 대응 화면을 정리할 예정이에요." }
+      { title: "현재 버전", copy: "MANGOMAP 베트남 여행자 현지 장소 지도를 테스트 중이에요." },
+      { title: "최근 개선", copy: "장소 상세, 한국어 후기, 제보, 저장 흐름을 중심으로 정리했어요." },
+      { title: "다음 예정", copy: "제보 승인 관리, 업체 혜택, 장소별 공유 화면을 정리할 예정이에요." }
     ]
   },
   support: {
     title: "고객센터",
     subtitle: "오류, 제휴, 신고 문의는 운영자가 확인할 수 있는 채널로 연결해야 해요.",
     rows: [
-      { title: "오류 신고", copy: "장소 위치 오류, 로그인 문제, 장터 저장 실패 화면을 캡처해서 문의하면 빨라요." },
-      { title: "거래 신고", copy: "사기 의심, 노쇼, 부적절한 메시지는 거래방에서 신고하는 흐름으로 관리해요." },
+      { title: "오류 신고", copy: "장소 위치 오류, 로그인 문제, 후기/제보 저장 실패 화면을 캡처해서 문의하면 빨라요." },
+      { title: "장소 제보", copy: "허위 정보, 악성 후기, 부적절한 사진은 제보 후 운영자 검토로 관리해요." },
       { title: "문의 채널", copy: "출시 전에는 운영자 카카오톡 채널 또는 이메일 연결을 추가하는 것이 좋아요." }
     ]
   },
@@ -121,16 +129,16 @@ const settingsDetailContent: Record<SettingsDetailKey, { title: string; subtitle
     subtitle: "MANGOMAP을 안전하게 쓰기 위한 기본 이용 규칙이에요.",
     rows: [
       { title: "커뮤니티", copy: "허위 정보, 광고성 도배, 타인 비방, 개인정보 노출은 제한돼요." },
-      { title: "중고거래", copy: "판매 정보와 실제 물품이 다르면 판매자에게 책임이 있어요." },
-      { title: "모임", copy: "공개 장소에서 만나고, 비용과 시간을 대화방에서 먼저 확인해야 해요." }
+      { title: "장소 후기", copy: "방문하지 않은 장소를 확정적으로 단정하거나 악의적으로 비방하면 제한될 수 있어요." },
+      { title: "장소 제보", copy: "주소, 영업시간, 폐업 여부는 검토 후 지도에 반영돼요." }
     ]
   },
   privacy: {
     title: "개인정보 처리방침",
-    subtitle: "로그인, 프로필, 제보, 거래 데이터는 서비스 제공 목적에 맞춰 사용돼요.",
+    subtitle: "로그인, 프로필, 저장 장소, 후기, 제보 데이터는 서비스 제공 목적에 맞춰 사용돼요.",
     rows: [
-      { title: "수집 정보", copy: "소셜 로그인 식별자, 닉네임, 프로필, 작성한 글과 채팅 데이터가 저장될 수 있어요." },
-      { title: "보관 목적", copy: "모임/장터 이용, 신고 처리, 서비스 안전 관리에 사용돼요." },
+      { title: "수집 정보", copy: "소셜 로그인 식별자, 닉네임, 프로필, 저장 장소, 후기와 제보가 저장될 수 있어요." },
+      { title: "보관 목적", copy: "장소 추천 품질 개선, 신고 처리, 서비스 안전 관리에 사용돼요." },
       { title: "삭제 요청", copy: "설정 하단 계정 관리에서 삭제 요청을 남기면 운영자 확인 후 처리돼요." }
     ]
   },
@@ -215,13 +223,15 @@ export function MyScreen({
   const approvedReports = placeReports.filter((report) => String(report.status) === "승인" || String(report.status) === "승인됨").length;
   const rejectedReports = placeReports.filter((report) => String(report.status) === "반려").length;
   const reportViewCount = placeReports.reduce((total, report) => total + getPlaceReportViewCount(report), 0);
-  const helpedTravelerCount = reportViewCount + approvedReports * 5 + savedPlaceCount;
+  const contributionImpactCount = reportViewCount + approvedReports * 5;
+  const hasContributionActivity = placeReports.length > 0 || savedPlaceCount > 0;
+  const explorerLevel = getExplorerLevel(savedPlaceCount, placeReports.length, approvedReports);
   const displayName = memberName ?? "비회원";
   const myTemperature = memberName ? `${memberTemperature.toFixed(1)}°C` : "-";
   const mangoTemperatureTitle = memberName ? `망고온도 ${myTemperature}` : "가입하면 망고온도가 생겨요";
   const mangoTemperatureCopy = memberName
-    ? "제보, 댓글, 모임 참여, 깔끔한 거래가 쌓이면 올라가는 MANGOMAP의 대표 신뢰 지표예요."
-    : "장소 제보와 댓글, 모임과 중고거래 활동이 하나의 신뢰 온도로 쌓여요.";
+    ? "정확한 장소 제보와 한국어 후기가 쌓이면 올라가는 MANGOMAP의 대표 신뢰 지표예요."
+    : "장소 제보와 한국어 후기 활동이 하나의 신뢰 온도로 쌓여요.";
   const authProviderLabel = getAuthProviderLabel(memberProvider);
   const authIdentity = getAuthIdentity(memberProvider, memberIdentity);
   const profileComplete = Boolean(memberProfile?.avatarUri || memberProfile?.bio || memberProfile?.homeBase || memberProfile?.travelStyle || memberProfile?.interestTags?.length);
@@ -322,7 +332,7 @@ export function MyScreen({
       onVerifyPhone?.(result.phone, result.phoneVerifiedAt);
       setPhoneOtpSent(false);
       setPhoneCode("");
-      setPhoneStatus("전화번호 인증이 완료됐어요. 이제 판매글 등록, 거래문의, 거래완료, 평가가 가능해요.");
+      setPhoneStatus("전화번호 인증이 완료됐어요. 이제 후기와 제보 신뢰 표시를 강화할 수 있어요.");
     } catch {
       setPhoneStatus("인증번호가 맞지 않거나 만료됐어요. 다시 확인해주세요.");
     } finally {
@@ -383,15 +393,14 @@ export function MyScreen({
 
         <View style={styles.settingsGroup}>
           <Text style={styles.settingsGroupTitle}>관리</Text>
-          <SettingsRow title="내 모임 관리" value="방입장·모임 만들기" onPress={onOpenMeetups} />
-          <SettingsRow title="중고장터 관리" value="판매글·거래문의" onPress={onOpenMarketplace} />
+          <SettingsRow title="제보한 장소 관리" value="검토중·승인 상태" onPress={onOpenReport} />
           <SettingsRow title="차단 회원 관리" value="숨김·해제 안내" onPress={() => setSettingsDetailKey("blocked")} />
-          <SettingsRow title="거래 안전 가이드" value="직거래·신고 안내" onPress={() => setSettingsDetailKey("safety")} />
+          <SettingsRow title="장소 신뢰 가이드" value="후기·제보 기준" onPress={() => setSettingsDetailKey("safety")} />
         </View>
 
         <View style={styles.settingsGroup}>
           <Text style={styles.settingsGroupTitle}>알림</Text>
-          <SettingsRow title="알림 설정" value="채팅·댓글·거래" onPress={() => setSettingsDetailKey("notifications")} />
+          <SettingsRow title="알림 설정" value="후기·제보·저장 장소" onPress={() => setSettingsDetailKey("notifications")} />
         </View>
 
         <View style={styles.settingsGroup}>
@@ -444,7 +453,7 @@ export function MyScreen({
       <Header
         eyebrow="마이"
         title="내 활동"
-        subtitle="찜한 스팟, 제보, 모임, 중고거래를 한 곳에서 관리해요."
+        subtitle="찜한 스팟, 제보, 한국어 후기를 한 곳에서 관리해요."
         compactMascot
         dark
       />
@@ -467,8 +476,8 @@ export function MyScreen({
           {memberName ? <Text style={styles.authBadge}>{authProviderLabel} 인증{authIdentity ? ` · ${authIdentity}` : ""}</Text> : null}
           <Text style={styles.copy}>
             {memberName
-              ? memberProfile?.bio ?? "모임과 중고장터를 사용할 수 있는 인증 계정이에요."
-              : "지도와 탐색은 바로 볼 수 있고, 모임과 중고거래는 카카오/Google 로그인 후 이용해요."}
+              ? memberProfile?.bio ?? "장소 제보와 한국어 후기를 남길 수 있는 인증 계정이에요."
+              : "지도와 탐색은 바로 볼 수 있고, 후기와 제보는 카카오/Google 로그인 후 이용해요."}
           </Text>
           {memberName && (memberProfile?.homeBase || memberProfile?.travelStyle) ? (
             <View style={styles.profileMetaRow}>
@@ -508,12 +517,12 @@ export function MyScreen({
         <View style={[styles.phoneTrustCard, phoneVerified && styles.phoneTrustCardVerified]}>
           <View style={styles.phoneTrustHeader}>
             <View>
-              <Text style={styles.phoneTrustEyebrow}>거래 신뢰 인증</Text>
+              <Text style={styles.phoneTrustEyebrow}>후기 신뢰 인증</Text>
               <Text style={styles.phoneTrustTitle}>{phoneVerified ? "전화번호 인증 완료" : "전화번호 인증이 필요해요"}</Text>
               <Text style={styles.phoneTrustCopy}>
                 {phoneVerified
-                  ? "판매글 등록, 거래문의, 거래완료, 망고온도 평가를 사용할 수 있어요."
-                  : "구글/카카오 로그인은 가입용이고, 전화번호는 장터에서 실제 거래를 시작할 때 쓰는 신뢰 인증이에요."}
+                  ? "장소 후기와 제보 신뢰 표시를 더 강하게 사용할 수 있어요."
+                  : "구글/카카오 로그인은 가입용이고, 전화번호는 신뢰 제보가 필요할 때만 쓰는 보조 인증이에요."}
               </Text>
             </View>
             <Text style={styles.phoneTrustBadge}>{phoneVerified ? "인증됨" : "필요"}</Text>
@@ -647,13 +656,79 @@ export function MyScreen({
         </View>
       ) : null}
 
-      <View style={styles.statsGrid}>
+      <View style={styles.activityOverviewCard}>
+        <View style={styles.activityOverviewTop}>
+          <View style={styles.activityOverviewCopy}>
+            <Text style={styles.activityOverviewEyebrow}>내 망고맵</Text>
+            <Text style={styles.activityOverviewTitle}>{memberName ? explorerLevel.title : "저장과 제보를 한 곳에서 관리"}</Text>
+            <Text style={styles.activityOverviewText}>
+              {memberName
+                ? explorerLevel.copy
+                : "로그인하면 찜한 장소, 스팟 제보, 한국어 후기를 관리할 수 있어요."}
+            </Text>
+          </View>
+          <Pressable accessibilityRole="button" onPress={() => setSettingsOpen(true)} style={styles.activitySettingsButton}>
+            <Text style={styles.activitySettingsText}>설정</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.activityMetricRow}>
+          <View style={styles.activityMetric}>
+            <Text style={styles.activityMetricLabel}>저장</Text>
+            <Text style={styles.activityMetricValue}>{savedPlaceCount}곳</Text>
+          </View>
+          <View style={styles.activityMetric}>
+            <Text style={styles.activityMetricLabel}>제보</Text>
+            <Text style={styles.activityMetricValue}>{placeReports.length}건</Text>
+          </View>
+          <View style={styles.activityMetric}>
+            <Text style={styles.activityMetricLabel}>지도 반영</Text>
+            <Text style={styles.activityMetricValue}>{approvedReports}건</Text>
+          </View>
+        </View>
+
+        {placeReports.length > 0 ? (
+          <View style={styles.activityRecentReport}>
+            <View style={styles.activityRecentCopy}>
+              <Text style={styles.activityRecentLabel}>최근 제보</Text>
+              <Text style={styles.activityRecentTitle} numberOfLines={1}>{placeReports[0].name}</Text>
+            </View>
+            <Text style={styles.activityRecentBadge}>{getPlaceReportStatusLabel(placeReports[0])}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.activityActionList}>
+          <Pressable accessibilityRole="button" onPress={onOpenPlaces} style={styles.activityActionRow}>
+            <View>
+              <Text style={styles.activityActionTitle}>장소 찾기</Text>
+              <Text style={styles.activityActionCopy}>검증된 맛집, 카페, 마사지 보기</Text>
+            </View>
+            <Text style={styles.activityActionArrow}>›</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={savedPlaceCount > 0 ? onOpenSaved : onOpenPlaces} style={styles.activityActionRow}>
+            <View>
+              <Text style={styles.activityActionTitle}>찜한 장소</Text>
+              <Text style={styles.activityActionCopy}>{savedPlaceCount > 0 ? "저장한 장소 다시 보기" : "마음에 드는 장소를 저장해보세요"}</Text>
+            </View>
+            <Text style={styles.activityActionArrow}>›</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={onOpenReport} style={styles.activityActionRow}>
+            <View>
+              <Text style={styles.activityActionTitle}>스팟 제보</Text>
+              <Text style={styles.activityActionCopy}>새 장소나 잘못된 정보 알려주기</Text>
+            </View>
+            <Text style={styles.activityActionArrow}>›</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={[styles.statsGrid, styles.hiddenBlock]}>
         <StatCard label="찜한 스팟" value={`${savedPlaceCount}곳`} />
         <StatCard label="스팟 제보" value={`${placeReports.length}건`} />
         <StatCard label="망고온도" value={myTemperature} />
       </View>
 
-      <View style={styles.mangoLevelCard}>
+      <View style={[styles.mangoLevelCard, styles.hiddenBlock]}>
         <View style={styles.mangoLevelTop}>
           <View>
             <Text style={styles.mangoLevelEyebrow}>MANGOMAP 신뢰</Text>
@@ -662,41 +737,65 @@ export function MyScreen({
           <Text style={styles.mangoLevelBadge}>{memberName ? "대표 지표" : "시작"}</Text>
         </View>
         <Text style={styles.mangoLevelCopy}>{mangoTemperatureCopy}</Text>
+        <View style={styles.mangoRuleGrid}>
+          <View style={styles.mangoRuleCard}>
+            <Text style={styles.mangoRuleValue}>+0.2°C</Text>
+            <Text style={styles.mangoRuleLabel}>한국어 후기</Text>
+          </View>
+          <View style={styles.mangoRuleCard}>
+            <Text style={styles.mangoRuleValue}>+0.3°C</Text>
+            <Text style={styles.mangoRuleLabel}>스팟 제보</Text>
+          </View>
+        </View>
         <View style={styles.mangoMissionRow}>
-          <Text style={styles.mangoMissionPill}>도움받은 여행자 {helpedTravelerCount}명</Text>
-          <Text style={styles.mangoMissionPill}>승인 제보 {approvedReports}건</Text>
-          <Text style={styles.mangoMissionPill}>전체 제보 {placeReports.length}건</Text>
+          {hasContributionActivity ? (
+            <>
+              <Text style={styles.mangoMissionPill}>제보 조회 {contributionImpactCount}명</Text>
+              <Text style={styles.mangoMissionPill}>지도 반영 {approvedReports}건</Text>
+              <Text style={styles.mangoMissionPill}>내 제보 {placeReports.length}건</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.mangoMissionPill}>온도 시작점</Text>
+              <Text style={styles.mangoMissionPill}>첫 후기 대기</Text>
+              <Text style={styles.mangoMissionPill}>첫 제보 대기</Text>
+            </>
+          )}
         </View>
       </View>
 
-      <View style={styles.quickGrid}>
+      <View style={[styles.quickGrid, styles.hiddenBlock]}>
         <ActionCard
           title="찜한 스팟"
           copy={savedPlaceCount > 0 ? "저장한 장소 다시 보기" : "마음에 드는 스팟 저장하기"}
           badge={`${savedPlaceCount}곳`}
+          actionLabel={savedPlaceCount > 0 ? "저장 목록 보기" : "장소 둘러보기"}
           onPress={savedPlaceCount > 0 ? onOpenSaved : onOpenPlaces}
         />
         <ActionCard
           title="스팟 제보"
-          copy="맛집, 마사지, 카페, 가라오케 추천"
+          copy="새 장소·영업시간·주소 수정 제보"
           badge="제보"
+          actionLabel="제보하러 가기"
           onPress={onOpenReport}
         />
         <ActionCard
-          title="내 모임"
-          copy="방입장, 모임 만들기, 대화방"
-          badge={memberName ? "가능" : "가입 필요"}
-          onPress={onOpenMeetups}
+          title="한국어 후기"
+          copy="방문 팁과 가격·분위기 기록"
+          badge={memberName ? "작성" : "가입 필요"}
+          actionLabel="후기 남기기"
+          onPress={onOpenPlaces}
         />
         <ActionCard
-          title="중고장터"
-          copy="판매글, 거래문의, 1:1 대화"
-          badge={memberName ? "가능" : "가입 필요"}
-          onPress={onOpenMarketplace}
+          title="지도에서 찾기"
+          copy="검증된 맛집·카페·마사지 보기"
+          badge="탐색"
+          actionLabel="장소 보기"
+          onPress={onOpenPlaces}
         />
       </View>
 
-      <View style={styles.reportStatusCard}>
+      <View style={[styles.reportStatusCard, styles.hiddenBlock]}>
         <View style={styles.reportStatusHeader}>
           <View>
             <Text style={styles.reportStatusEyebrow}>내 제보 현황</Text>
@@ -712,7 +811,7 @@ export function MyScreen({
             <Text style={styles.reportSummaryPill}>반영 대기 {reflectionWaitingReports}건</Text>
             <Text style={styles.reportSummaryPill}>승인 {approvedReports}건</Text>
             {rejectedReports > 0 ? <Text style={styles.reportSummaryPill}>반려 {rejectedReports}건</Text> : null}
-            <Text style={styles.reportSummaryPill}>도움 {helpedTravelerCount}명</Text>
+            <Text style={styles.reportSummaryPill}>기여 영향 {contributionImpactCount}명</Text>
             <Text style={styles.reportSummaryPill}>조회 {reportViewCount}명</Text>
           </View>
         ) : null}
@@ -736,10 +835,10 @@ export function MyScreen({
         )}
       </View>
 
-      <View style={styles.noticeCard}>
-        <Text style={styles.noticeEyebrow}>안전 체크</Text>
-        <InfoRow title="모임" copy="공개 장소에서 먼저 만나고, 시간·장소·비용을 대화방에서 확인해요." />
-        <InfoRow title="중고거래" copy="망고온도는 36.5도에서 시작하고, 거래가 깔끔할수록 올라가는 신뢰 신호예요." />
+      <View style={[styles.noticeCard, styles.hiddenBlock]}>
+        <Text style={styles.noticeEyebrow}>장소 신뢰 기준</Text>
+        <InfoRow title="확인됨" copy="주소·카테고리·Google Maps 연결을 확인한 장소예요." />
+        <InfoRow title="한국어 후기" copy="한국인 여행자가 가격, 분위기, 접근성을 남기면 신뢰도가 올라가요." />
         <InfoRow title="스팟 제보" copy="여행자가 직접 올린 장소는 검토중 상태로 분리해서 관리해요." />
       </View>
     </AppShell>
@@ -755,7 +854,19 @@ function StatCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ActionCard({ title, copy, badge, onPress }: { title: string; copy: string; badge: string; onPress: () => void }) {
+function ActionCard({
+  title,
+  copy,
+  badge,
+  actionLabel,
+  onPress
+}: {
+  title: string;
+  copy: string;
+  badge: string;
+  actionLabel: string;
+  onPress: () => void;
+}) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.actionCard}>
       <View style={styles.actionTop}>
@@ -763,7 +874,7 @@ function ActionCard({ title, copy, badge, onPress }: { title: string; copy: stri
         <Text style={styles.actionBadge}>{badge}</Text>
       </View>
       <Text style={styles.actionCopy}>{copy}</Text>
-      <Text style={styles.actionLink}>열기</Text>
+      <Text style={styles.actionLink}>{actionLabel}</Text>
     </Pressable>
   );
 }
@@ -1463,6 +1574,163 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "900"
   },
+  hiddenBlock: {
+    display: "none"
+  },
+  activityOverviewCard: {
+    marginTop: 16,
+    borderRadius: 28,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(183,121,0,0.14)",
+    padding: 18,
+    gap: 16,
+    ...shadow
+  },
+  activityOverviewTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  activityOverviewCopy: {
+    flex: 1,
+    minWidth: 0
+  },
+  activityOverviewEyebrow: {
+    color: "#FF9F1C",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900"
+  },
+  activityOverviewTitle: {
+    color: colors.ink,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: "900",
+    marginTop: 4
+  },
+  activityOverviewText: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "800",
+    marginTop: 6
+  },
+  activitySettingsButton: {
+    minWidth: 58,
+    minHeight: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF3C4",
+    borderWidth: 1,
+    borderColor: "#FFD43B",
+    paddingHorizontal: 12
+  },
+  activitySettingsText: {
+    color: "#8A5A00",
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  activityMetricRow: {
+    flexDirection: "row",
+    gap: 8
+  },
+  activityMetric: {
+    flex: 1,
+    minHeight: 64,
+    borderRadius: 18,
+    backgroundColor: "#FFF8E6",
+    borderWidth: 1,
+    borderColor: "#F0D89A",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    justifyContent: "center"
+  },
+  activityMetricLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  activityMetricValue: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: "900",
+    marginTop: 4
+  },
+  activityRecentReport: {
+    minHeight: 54,
+    borderRadius: 18,
+    backgroundColor: "#063F28",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  activityRecentCopy: {
+    flex: 1,
+    minWidth: 0
+  },
+  activityRecentLabel: {
+    color: "#FFD43B",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  activityRecentTitle: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900",
+    marginTop: 3
+  },
+  activityRecentBadge: {
+    color: "#063F28",
+    fontSize: 12,
+    fontWeight: "900",
+    backgroundColor: "#FFD43B",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6
+  },
+  activityActionList: {
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(18,32,51,0.08)"
+  },
+  activityActionRow: {
+    minHeight: 66,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(18,32,51,0.06)"
+  },
+  activityActionTitle: {
+    color: colors.ink,
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: "900"
+  },
+  activityActionCopy: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "800",
+    marginTop: 3
+  },
+  activityActionArrow: {
+    color: "#B77900",
+    fontSize: 28,
+    lineHeight: 30,
+    fontWeight: "900"
+  },
   statsGrid: {
     flexDirection: "row",
     gap: 10,
@@ -1536,6 +1804,35 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     fontWeight: "800",
     marginTop: 10
+  },
+  mangoRuleGrid: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 13
+  },
+  mangoRuleCard: {
+    flex: 1,
+    minHeight: 58,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,247,223,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(255,194,51,0.18)",
+    paddingHorizontal: 9,
+    paddingVertical: 8,
+    justifyContent: "center"
+  },
+  mangoRuleValue: {
+    color: "#FFC233",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900"
+  },
+  mangoRuleLabel: {
+    color: "#FFF7DF",
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "900",
+    marginTop: 3
   },
   mangoMissionRow: {
     flexDirection: "row",

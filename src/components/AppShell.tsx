@@ -1,4 +1,5 @@
 import type { PropsWithChildren } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -8,10 +9,21 @@ type AppShellProps = PropsWithChildren<{
   scroll?: boolean;
   withBottomNav?: boolean;
   backgroundColor?: string;
+  maxWidth?: number;
+  horizontalPadding?: number;
+  contentStyle?: StyleProp<ViewStyle>;
 }>;
 
-export function AppShell({ children, scroll = true, withBottomNav, backgroundColor }: AppShellProps) {
-  const content = <View style={styles.content}>{children}</View>;
+export function AppShell({
+  children,
+  scroll = true,
+  withBottomNav,
+  backgroundColor,
+  maxWidth = 560,
+  horizontalPadding = 20,
+  contentStyle
+}: AppShellProps) {
+  const content = <View style={[styles.content, { maxWidth, paddingHorizontal: horizontalPadding }, contentStyle]}>{children}</View>;
 
   return (
     <SafeAreaView style={[styles.safeArea, backgroundColor ? { backgroundColor } : null]}>
@@ -23,7 +35,7 @@ export function AppShell({ children, scroll = true, withBottomNav, backgroundCol
           {content}
         </ScrollView>
       ) : (
-        <View style={withBottomNav && styles.navPadding}>{content}</View>
+        <View style={[styles.fixedContent, withBottomNav && styles.navPadding]}>{content}</View>
       )}
     </SafeAreaView>
   );
@@ -61,12 +73,18 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+    alignItems: "center",
+    zIndex: 1
+  },
+  fixedContent: {
+    flex: 1,
+    alignItems: "center",
     zIndex: 1
   },
   content: {
     flex: 1,
     width: "100%",
-    maxWidth: 520,
+    maxWidth: 560,
     alignSelf: "center",
     paddingHorizontal: 20,
     paddingVertical: 18

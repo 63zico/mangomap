@@ -136,7 +136,13 @@ export function PlannerFormScreen({ initialDestination, onBack, onGenerate }: Pl
                 }}
                 style={[screenStyles.destinationItem, destination === item.name && screenStyles.selectedDestination]}
               >
-                <Image source={{ uri: item.imageUrl }} style={screenStyles.destinationImage} />
+                {item.imageUrl ? (
+                  <Image source={{ uri: item.imageUrl }} style={screenStyles.destinationImage} />
+                ) : (
+                  <View style={[screenStyles.destinationImage, screenStyles.destinationImagePlaceholder]}>
+                    <Text style={screenStyles.destinationImageInitial}>{item.name.slice(0, 1)}</Text>
+                  </View>
+                )}
                 <View style={screenStyles.destinationTextWrap}>
                   <Text style={screenStyles.destinationName}>{item.name}</Text>
                   <Text style={screenStyles.destinationMood}>{item.subtitle}</Text>
@@ -496,6 +502,18 @@ const screenStyles = StyleSheet.create({
     height: 72,
     borderRadius: 16,
     backgroundColor: colors.line
+  },
+  destinationImagePlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,194,51,0.42)",
+    backgroundColor: "#FFF1C2"
+  },
+  destinationImageInitial: {
+    color: colors.sunset,
+    fontSize: 26,
+    fontWeight: "900"
   },
   destinationTextWrap: {
     flex: 1

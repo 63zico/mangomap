@@ -16,18 +16,19 @@ export function OnboardingScreen({ onStart, onOpenPhrasebook, onOpenSavedTrips }
     <AppShell>
       <View style={styles.hero}>
         <BrandLogo size={244} />
-        <Text style={styles.copy}>베트남 여행자 지도, 모임, 장터를 망고처럼 쉽게 찾아요.</Text>
+        <Text style={styles.copy}>한국인이 검증한 베트남 현지 장소를 망고처럼 쉽게 찾아요.</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>검색 대신 바로 쓸 수 있게</Text>
+        <Text style={styles.cardTitle}>Google Maps 보기 전에 빠르게 거르기</Text>
         <Text style={styles.cardCopy}>
-          한국인 후기 많은 핫플, 숙소 기준 동선, 날씨 대체, 밤 이동 팁, 현지 번개까지 초행자 기준으로 정리해요.
+          맛집, 카페, 마사지, 생활장소를 한국어 후기와 최근 확인 상태로 먼저 정리해요.
+          여행자는 실패 확률을 줄이고, 좋은 장소는 제보로 더 정확해져요.
         </Text>
         <View style={styles.valueList}>
-          <Text style={styles.valueItem}>✓ 한국어 후기와 리뷰수 기준 핫플</Text>
-          <Text style={styles.valueItem}>✓ 비 오거나 더울 때 바로 대체</Text>
-          <Text style={styles.valueItem}>✓ 여행 중 동행/이벤트까지 확인</Text>
+          <Text style={styles.valueItem}>✓ 한국인 후기와 제보 상태 기반</Text>
+          <Text style={styles.valueItem}>✓ 가격대·영업시간·추천 상황 정리</Text>
+          <Text style={styles.valueItem}>✓ Google Maps 길찾기로 바로 연결</Text>
         </View>
       </View>
 

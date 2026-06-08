@@ -183,6 +183,28 @@ export type GooglePlacesState = {
 
 export type CuratedPlaceCategory = "맛집" | "카페" | "바/루프탑" | "가라오케" | "마사지" | "사진명소" | "쇼핑" | "환전" | "투어/액티비티";
 
+export type PlaceReferenceReview = {
+  nickname: string;
+  rating: number;
+  visitStatus: "방문 완료" | "방문 예정";
+  tags: string[];
+  content: string;
+  source: "google_reference" | "user";
+};
+
+export type PlacePartnerBenefit = {
+  id: string;
+  status: "active" | "paused" | "pending";
+  partnerName: string;
+  title: string;
+  summary: string;
+  usageGuide: string;
+  terms: string[];
+  verifiedAt?: string;
+  validUntil?: string;
+  source?: "merchant" | "manual";
+};
+
 export type CuratedPlace = {
   id: string;
   city: Destination;
@@ -205,8 +227,21 @@ export type CuratedPlace = {
     longitude: number;
   };
   photoName?: string;
+  photoNames?: string[];
+  googlePriceLevel?: string;
+  priceDataSource?: "Google Places API" | "manual" | string;
   rating?: number;
   userRatingCount?: number;
+  websiteUri?: string;
+  internationalPhoneNumber?: string;
+  nationalPhoneNumber?: string;
+  businessStatus?: "OPERATIONAL" | "CLOSED_TEMPORARILY" | "CLOSED_PERMANENTLY" | string;
+  openingHoursText?: string[];
+  openNow?: boolean;
+  lastVerifiedAt?: string;
+  latestInfoSource?: "Google Places API" | "manual" | string;
+  reviews?: PlaceReferenceReview[];
+  partnerBenefit?: PlacePartnerBenefit;
   koreanReviewSignal?: {
     score: number;
     reviewCount: number;

@@ -376,7 +376,7 @@ function getWeatherPlanCopy(liveInfo: LiveTravelInfo) {
   if (liveInfo.weather.status !== "ready") return "날씨 데이터를 불러오는 중이에요. 그래도 야외 코스는 실내 대체로 바꿀 수 있어요.";
   const isRainy = (liveInfo.weather.precipitationMm ?? 0) > 0;
   const isHot = (liveInfo.weather.temperatureC ?? 0) >= 32;
-  if (isRainy) return `${liveInfo.weather.condition} · 비가 감지돼요. 야외 사진명소와 액티비티를 실내 코스로 바꿔보세요.`;
+  if (isRainy) return `${liveInfo.weather.condition} · 비가 감지돼요. 야외 관광명소와 액티비티를 실내 코스로 바꿔보세요.`;
   if (isHot) return `${liveInfo.weather.temperatureC}°C · 더운 날이에요. 오후 야외 코스를 카페/마사지로 줄이면 좋아요.`;
   return `${liveInfo.weather.temperatureC}°C · ${liveInfo.weather.condition}. 컨디션에 맞춰 실내 위주로도 조정할 수 있어요.`;
 }

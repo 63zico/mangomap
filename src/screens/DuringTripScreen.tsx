@@ -4490,15 +4490,7 @@ function getDefaultVibe(category: MeetupCategory) {
 }
 
 function getDefaultMeetupPhoto(destination: Destination, category: MeetupCategory) {
-  const key = `${destination}-${category}`;
-  const images = [
-    "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=900&q=80",
-    "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=900&q=80",
-    "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=80",
-    "https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=900&q=80"
-  ];
-  const seed = Array.from(key).reduce((sum, character) => sum + character.charCodeAt(0), 0);
-  return images[seed % images.length];
+  return undefined;
 }
 
 function getDefaultLevel(category: MeetupCategory) {
@@ -4669,7 +4661,7 @@ function buildHotplaceReason(place: CuratedPlace) {
     "다음 야간 일정 전에 쉬어가기 좋은 선택이에요."
   ]);
   if (place.category === "바/루프탑") return "저녁 이후 분위기 전환이 필요할 때 쓰기 좋아요.";
-  if (place.category === "사진명소") return "동선이 밋밋할 때 사진 포인트로 짧게 끼우기 좋아요.";
+  if (place.category === "사진명소") return "동선이 밋밋할 때 관광명소로 짧게 끼우기 좋아요.";
   if (place.category === "쇼핑") return "비 오거나 더울 때 실내 대체 코스로 쓰기 좋아요.";
   if (place.hiddenGem) return "일정이 너무 뻔할 때 넣기 좋은 숨은 후보예요.";
   if (place.beginnerSafe) return getStableReason(place.id, [

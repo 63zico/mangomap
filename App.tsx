@@ -44,7 +44,7 @@ const initialInput: PlannerInput = {
   avoid: ""
 };
 
-const tabScreens: ScreenName[] = ["home", "places", "travel", "marketplace", "my"];
+const tabScreens: ScreenName[] = ["places", "home", "saved", "my"];
 const welcomeStorageKey = "mangomap-welcome-seen-v1";
 const memberStorageKey = "tripbuddy-member-profile-v1";
 const memberTemperatureStorageKey = "tripbuddy-member-temperature-v1";
@@ -146,7 +146,7 @@ function saveMemberTemperature(value: number) {
 }
 
 export default function App() {
-  const [screen, setScreen] = useState<ScreenName>("home");
+  const [screen, setScreen] = useState<ScreenName>("places");
   const [showWelcomePopup, setShowWelcomePopup] = useState(() => !loadWelcomeSeen());
   const [plannerInput, setPlannerInput] = useState<PlannerInput>(initialInput);
   const [currentItinerary, setCurrentItinerary] = useState<Itinerary>(() => generateItinerary(initialInput));
@@ -264,16 +264,16 @@ export default function App() {
     setScreen("places");
   };
 
-  const openWelcomeMeetups = () => {
+  const openWelcomePopularPlaces = () => {
     closeWelcomePopup();
-    openTravel();
+    openPlaces("all", plannerInput.destination);
   };
 
   const openWelcomeJoin = () => {
     closeWelcomePopup();
     setAuthPrompt({
       title: "MANGOMAP 시작하기",
-      copy: "지도와 탐색은 바로 볼 수 있고, 모임 방입장과 중고거래 1:1 대화는 카카오/Google 로그인 후 사용할 수 있어요."
+      copy: "지도와 장소 탐색은 바로 볼 수 있고, 저장·한국어 후기·장소 제보는 카카오 또는 Google 로그인 후 사용할 수 있어요."
     });
   };
 
@@ -420,11 +420,13 @@ export default function App() {
   };
 
   const submitPlaceReport = async (report: PlaceReport) => {
+    const isNewReport = !placeReports.some((candidate) => candidate.id === report.id);
     const nextReports = await savePlaceReport({
       ...report,
       reporterId: memberProfile?.authUid ?? memberProfile?.id ?? report.reporterId
     });
     setPlaceReports(nextReports);
+    if (memberProfile && isNewReport) updateMemberTemperature(0.3);
   };
 
   const removePlaceReport = async (reportId: string) => {
@@ -513,6 +515,14 @@ export default function App() {
             onOpenTravel={() => openTravel()}
             onOpenMarketplace={() => openMarketplace()}
             onOpenReport={openPlaceReport}
+            onSubmitPlaceReport={submitPlaceReport}
+            memberId={memberProfile?.authUid ?? memberProfile?.id}
+            onRequireAuth={() =>
+              setAuthPrompt({
+                title: "MANGOMAP 제보 참여",
+                copy: "장소 제보와 정보 수정 요청은 검토 상태를 남겨야 해서 카카오 또는 Google 로그인 후 사용할 수 있어요."
+              })
+            }
             focusedPlace={mapFocusPlace}
           />
         )}
@@ -590,7 +600,6 @@ export default function App() {
             memberName={memberProfile?.nickname}
             memberTemperature={memberTemperature}
             entryMode={marketplaceEntryMode}
-            onTemperatureChange={updateMemberTemperature}
             onRequireAuth={() =>
               setAuthPrompt({
                 title: "중고장터 참여는 가입 후 가능해요",
@@ -625,7 +634,7 @@ export default function App() {
             onRequireAuth={() =>
               setAuthPrompt({
                 title: "MANGOMAP 가입하기",
-                copy: "지도와 장소 탐색은 바로 볼 수 있고, 프로필·모임·중고거래·망고온도는 인증 후 사용할 수 있어요."
+                copy: "지도와 장소 탐색은 바로 볼 수 있고, 프로필·저장·한국어 후기·장소 제보는 인증 후 사용할 수 있어요."
               })
             }
             onUpdateProfile={updateMemberProfile}
@@ -637,7 +646,7 @@ export default function App() {
         {showWelcomePopup ? (
           <WelcomePopup
             onExploreMap={openWelcomeMap}
-            onOpenMeetups={openWelcomeMeetups}
+            onOpenPopularPlaces={openWelcomePopularPlaces}
             onJoin={openWelcomeJoin}
             onClose={closeWelcomePopup}
           />

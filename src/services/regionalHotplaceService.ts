@@ -224,7 +224,7 @@ function mapPlace(destination: Destination, query: RegionalQuery, place: PlacesA
       reviewCount: koreanReviewCount,
       positiveCount: reviews.filter((review) => (review.rating ?? 0) >= 4).length,
       cautionCount,
-      summary: koreanReviewCount > 0 ? "실제 한국어 리뷰가 확인된 후보" : "Google 리뷰와 접근성을 기준으로 고른 후보",
+      summary: koreanReviewCount > 0 ? "한국어 후기가 확인된 장소" : "방문 동선에 넣기 쉬운 장소",
       keywords
     }
   };
@@ -324,15 +324,15 @@ function inferArea(destination: Destination, address: string) {
 }
 
 function buildOneLine(destination: Destination, category: CuratedPlaceCategory) {
-  if (category === "맛집") return `리뷰 500개 이상과 한국어 후기 신호를 기준으로 고른 ${destination} 맛집 후보`;
-  if (category === "카페") return `리뷰와 접근성을 기준으로 고른 ${destination} 카페 후보`;
-  if (category === "마사지") return `여행 중 체력 회복용으로 보기 좋은 ${destination} 마사지 후보`;
-  if (category === "바/루프탑") return `저녁 이후 분위기 전환용으로 보기 좋은 ${destination} 밤 코스 후보`;
-  if (category === "가라오케") return `밤에 룸으로 이동해 놀기 좋은 ${destination} 가라오케 후보`;
-  if (category === "사진명소") return `짧게 들러 사진 남기기 좋은 ${destination} 사진 코스 후보`;
-  if (category === "쇼핑") return `비 오는 날이나 기념품 쇼핑에 보기 좋은 ${destination} 쇼핑 후보`;
-  if (category === "환전") return `현금 준비가 필요할 때 확인하기 좋은 ${destination} 환전 후보`;
-  return `반일 일정에 넣기 좋은 ${destination} 투어와 액티비티 후보`;
+  if (category === "맛집") return `${destination}에서 식사 동선에 넣기 좋은 맛집`;
+  if (category === "카페") return `${destination}에서 더위 피하고 쉬기 좋은 카페`;
+  if (category === "마사지") return `${destination} 여행 중 체력 회복용 마사지 스팟`;
+  if (category === "바/루프탑") return `${destination}에서 저녁 이후 분위기 바꾸기 좋은 밤 코스`;
+  if (category === "가라오케") return `${destination}에서 일행과 늦게까지 놀기 좋은 가라오케`;
+  if (category === "사진명소") return `${destination}에서 짧게 들러 사진 남기기 좋은 코스`;
+  if (category === "쇼핑") return `${destination}에서 비 오는 날이나 기념품 쇼핑하기 좋은 곳`;
+  if (category === "환전") return `${destination}에서 현금 준비가 필요할 때 확인하기 좋은 환전소`;
+  return `${destination} 반일 일정에 넣기 좋은 투어와 액티비티`;
 }
 
 function buildKoreanTip(category: CuratedPlaceCategory) {

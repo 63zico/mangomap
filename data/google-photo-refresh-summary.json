@@ -1,0 +1,14 @@
+{
+  "generatedAt": "2026-06-05T08:58:30.458Z",
+  "applied": true,
+  "allCategories": true,
+  "requested": 1190,
+  "ok": 1190,
+  "failed": 0,
+  "resolvedByDetails": 702,
+  "resolvedByDetailsTextSearch": 15,
+  "resolvedByTextSearch": 473,
+  "withPhotos": 1187,
+  "noPhotos": 3,
+  "failures": []
+}

@@ -8,7 +8,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build": "expo export --platform web",
+    "build": "expo export --platform web && node scripts/generateSeoPages.mjs",
     "preview:web": "node scripts/serveWeb.mjs",
     "collect:places": "node scripts/collectGooglePlaces.mjs",
     "build:places": "node scripts/buildCuratedPlaces.mjs",

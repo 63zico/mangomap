@@ -1,12 +1,13 @@
 import { createElement, useEffect, useMemo, useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { BrandLogo } from "../components/BrandLogo";
 import { curatedPlaces } from "../data/places";
 import { isSupabaseConfigured, supabaseSelect } from "../services/supabaseClient";
 import { colors, neonShadow, shadow, sunsetGlow } from "../styles/theme";
-import type { CuratedPlace, CuratedPlaceCategory, Destination, GooglePlacesState, Itinerary, LiveTravelInfo, PlannerInput } from "../types";
+import type { CuratedPlace, CuratedPlaceCategory, Destination, GooglePlacesState, Itinerary, LiveTravelInfo, PlaceReport, PlannerInput } from "../types";
+import { trackEvent } from "../utils/analytics";
 import { getMangoCommentCount, getMangoRecommendationCount } from "../utils/placeCommunity";
 
 type HomeScreenProps = {
@@ -23,6 +24,31 @@ type HomeScreenProps = {
   onOpenTravel: () => void;
   onOpenMarketplace: () => void;
   onOpenReport: () => void;
+  onSubmitPlaceReport: (report: PlaceReport) => void | Promise<void>;
+  memberId?: string;
+  onRequireAuth?: () => void;
+};
+
+type QualityRequestType = "partner" | "correction";
+
+type QualityRequestConfig = {
+  eyebrow: string;
+  title: string;
+  copy: string;
+  nameLabel: string;
+  namePlaceholder: string;
+  detailLabel: string;
+  detailPlaceholder: string;
+  presets: string[];
+  reportNamePrefix: string;
+  reportCategory: PlaceReport["category"];
+};
+
+type QualityRequestForm = {
+  name: string;
+  area: string;
+  googleMapsUri: string;
+  detail: string;
 };
 
 type MapCategory = {
@@ -48,6 +74,15 @@ type HomeActivitySnapshot = {
   reportCount: number;
   latestItems: HomeActivityItem[];
   loaded: boolean;
+};
+
+type HomeReviewItem = {
+  id: string;
+  place: CuratedPlace;
+  nickname: string;
+  rating: number;
+  content: string;
+  tags: string[];
 };
 
 type HomeMeetupRow = {
@@ -95,18 +130,52 @@ const emptyHomeActivity: HomeActivitySnapshot = {
   loaded: false
 };
 
+const qualityRequestConfigs: Record<QualityRequestType, QualityRequestConfig> = {
+  partner: {
+    eyebrow: "업체/혜택 제안",
+    title: "한국인에게 도움 되는 혜택을 추천해주세요",
+    copy: "한국어 메뉴, 예약 혜택, 픽업, 할인처럼 여행자가 실제로 좋아할 만한 제안을 운영자가 검토해요.",
+    nameLabel: "업체명",
+    namePlaceholder: "예: ○○ 마사지, ○○ 식당",
+    detailLabel: "제안 내용",
+    detailPlaceholder: "예: 한국어 메뉴가 있고 예약하면 10% 할인 가능해 보여요.",
+    presets: ["한국어 메뉴", "예약 혜택", "픽업 가능", "할인/쿠폰", "단체 혜택"],
+    reportNamePrefix: "업체/혜택 제안",
+    reportCategory: "맛집"
+  },
+  correction: {
+    eyebrow: "정보 수정 요청",
+    title: "틀린 정보를 알려주면 지도 품질에 반영해요",
+    copy: "폐업, 이전, 가격 변동, 영업시간 변경처럼 방문 전에 꼭 알아야 하는 정보를 검토 요청할 수 있어요.",
+    nameLabel: "장소명",
+    namePlaceholder: "예: ○○ 카페, ○○ 식당",
+    detailLabel: "수정할 내용",
+    detailPlaceholder: "예: 영업시간이 바뀐 것 같아요. Google Maps에는 22시까지로 보여요.",
+    presets: ["영업시간 변경", "폐업/휴업", "주소 이전", "가격 변동", "사진 오류"],
+    reportNamePrefix: "정보 수정 요청",
+    reportCategory: "맛집"
+  }
+};
+
+function createQualityRequestForm(): QualityRequestForm {
+  return {
+    name: "",
+    area: "",
+    googleMapsUri: "",
+    detail: ""
+  };
+}
+
 const mapDestinations = ["호치민", "다낭", "나트랑", "하노이", "달랏", "푸꾸옥"] as const;
 type MapDestination = (typeof mapDestinations)[number];
 
 const mapCategories: MapCategory[] = [
-  { id: "food", filterId: "food", label: "맛집", dot: "#FF7A00", icon: "M", copy: "지금 갈 만한 식당" },
-  { id: "cafe", filterId: "cafe", label: "카페", dot: "#FFC233", icon: "C", copy: "사진·스페셜티" },
-  { id: "massage", filterId: "massage", label: "마사지", dot: "#3E8DFF", icon: "S", copy: "걷다가 쉬기 좋은 곳" },
-  { id: "rooftop", filterId: "night", label: "루프탑·바", dot: "#FF6F0F", icon: "R", copy: "밤공기 좋은 코스" },
-  { id: "market", filterId: "shopping", label: "시장·쇼핑", dot: "#FFB84D", icon: "B", copy: "벤탄·야시장·기념품" },
-  { id: "photo", filterId: "photo", label: "사진명소", dot: "#20D8D2", icon: "P", copy: "여행 사진 남길 곳" },
-  { id: "exchange", filterId: "exchange", label: "환전", dot: "#FDE047", icon: "V", copy: "환율 좋은 금은방·환전소" },
-  { id: "karaoke", filterId: "karaoke", label: "가라오케", dot: "#FF6F0F", icon: "K", copy: "밤 코스 후보" }
+  { id: "food", filterId: "food", label: "맛집", dot: "#FF7A00", icon: "M", copy: "한국인 후기 많은 식당" },
+  { id: "cafe", filterId: "cafe", label: "카페", dot: "#FFC233", icon: "C", copy: "쉬기 좋고 사진 남기기 좋은 카페" },
+  { id: "massage", filterId: "massage", label: "마사지", dot: "#3E8DFF", icon: "S", copy: "걷는 일정 중간 회복 코스" },
+  { id: "market", filterId: "shopping", label: "쇼핑", dot: "#FFB84D", icon: "B", copy: "시장·기념품·여행템" },
+  { id: "exchange", filterId: "exchange", label: "생활", dot: "#FDE047", icon: "V", copy: "환전·실용 장소" },
+  { id: "photo", filterId: "photo", label: "여행", dot: "#20D8D2", icon: "P", copy: "관광명소·밤코스·투어" }
 ];
 
 const cityCounts: Record<string, number> = {
@@ -140,17 +209,26 @@ export function HomeScreen({
   onOpenPlaces,
   onOpenTravel,
   onOpenMarketplace,
-  onOpenReport
+  onOpenReport,
+  onSubmitPlaceReport,
+  memberId,
+  onRequireAuth
 }: HomeScreenProps) {
   const [selectedCategoryId, setSelectedCategoryId] = useState("food");
   const [selectedMapDestination, setSelectedMapDestination] = useState<MapDestination>(input.destination);
   const [homeActivity, setHomeActivity] = useState<HomeActivitySnapshot>(emptyHomeActivity);
+  const [qualityRequestType, setQualityRequestType] = useState<QualityRequestType | null>(null);
+  const [qualityRequestForm, setQualityRequestForm] = useState<QualityRequestForm>(createQualityRequestForm);
+  const [qualityRequestStatus, setQualityRequestStatus] = useState("");
+  const [qualityRequestSubmitting, setQualityRequestSubmitting] = useState(false);
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 1024;
   const selectedCategory = mapCategories.find((category) => category.id === selectedCategoryId) ?? mapCategories[0];
   const visibleFocusedPlace =
     focusedPlace &&
     focusedPlace.city === selectedMapDestination &&
     getMapCategoryIdFromPlace(focusedPlace) === selectedCategory.id &&
-    hasSafeHomeMapCoordinates(focusedPlace, selectedMapDestination)
+    hasUsableHomeMapCoordinates(focusedPlace)
       ? focusedPlace
       : undefined;
   const mapHtml = useMemo(() => buildGoogleMapHtml(selectedMapDestination, selectedCategory, visibleFocusedPlace), [selectedMapDestination, selectedCategory, visibleFocusedPlace]);
@@ -158,22 +236,18 @@ export function HomeScreen({
     () => countHomeCategoryPlaces(selectedMapDestination, selectedCategory),
     [selectedMapDestination, selectedCategory]
   );
-  const liveCount = useMemo(
-    () => googlePlaces.restaurants.length + googlePlaces.cafes.length + 42,
-    [googlePlaces.restaurants.length, googlePlaces.cafes.length]
+  const selectedMapMarkerCount = useMemo(
+    () => countHomeMappableCategoryPlaces(selectedMapDestination, selectedCategory),
+    [selectedMapDestination, selectedCategory]
   );
-  const todayHotPlaces = useMemo(() => {
+  const topSavedPlaces = useMemo(() => {
     return dedupeHomePlaces(
       curatedPlaces.filter((place) => place.city === selectedMapDestination && !isHomeSuppressedPlace(place))
     )
       .sort((a, b) => getTodayHotScore(b) - getTodayHotScore(a))
-      .slice(0, 3);
+      .slice(0, 5);
   }, [selectedMapDestination]);
-  const todayReactionCount = useMemo(() => {
-    const baseCount = todayHotPlaces.reduce((total, place) => total + getMangoRecommendationCount(place) + getMangoCommentCount(place), 0);
-    const liveActivityBonus = homeActivity.meetupCount * 8 + homeActivity.marketCount * 3 + homeActivity.talkCount * 5 + homeActivity.reportCount * 4;
-    return Math.max(128, baseCount + selectedCategoryCount * 3 + liveCount + liveActivityBonus);
-  }, [homeActivity.marketCount, homeActivity.meetupCount, homeActivity.reportCount, homeActivity.talkCount, liveCount, selectedCategoryCount, todayHotPlaces]);
+  const recentKoreanReviews = useMemo(() => buildRecentKoreanReviews(topSavedPlaces), [topSavedPlaces]);
 
   useEffect(() => {
     setSelectedMapDestination(input.destination);
@@ -184,6 +258,10 @@ export function HomeScreen({
     setSelectedMapDestination(focusedPlace.city);
     setSelectedCategoryId(getMapCategoryIdFromPlace(focusedPlace));
   }, [focusedPlace]);
+
+  useEffect(() => {
+    trackEvent("view_home", { city: selectedMapDestination });
+  }, [selectedMapDestination]);
 
   useEffect(() => {
     let active = true;
@@ -201,11 +279,113 @@ export function HomeScreen({
     };
   }, [selectedMapDestination]);
 
+  const openNearbyPlaces = () => {
+    trackEvent("click_nearby_places", { city: selectedMapDestination, source: "home_hero" });
+    onOpenPlaces("all", selectedMapDestination);
+  };
+
+  const openPopularPlaces = () => {
+    trackEvent("click_nearby_places", { city: selectedMapDestination, filter: selectedCategory.filterId, source: "home_popular" });
+    onOpenPlaces(selectedCategory.filterId, selectedMapDestination);
+  };
+
+  const openReportFromHome = () => {
+    trackEvent("report_place", { city: selectedMapDestination, source: "home_trust_card" });
+    onOpenReport();
+  };
+
+  const openQualityRequest = (requestType: QualityRequestType) => {
+    if (!memberId) {
+      onRequireAuth?.();
+      return;
+    }
+    trackEvent("report_place", { city: selectedMapDestination, source: `home_quality_${requestType}` });
+    setQualityRequestType(requestType);
+    setQualityRequestForm(createQualityRequestForm());
+    setQualityRequestStatus("");
+  };
+
+  const closeQualityRequest = () => {
+    if (qualityRequestSubmitting) return;
+    setQualityRequestType(null);
+    setQualityRequestStatus("");
+  };
+
+  const updateQualityRequestForm = (updates: Partial<QualityRequestForm>) => {
+    setQualityRequestForm((current) => ({ ...current, ...updates }));
+  };
+
+  const addQualityRequestPreset = (preset: string) => {
+    setQualityRequestForm((current) => ({
+      ...current,
+      detail: current.detail.includes(preset) ? current.detail : `${current.detail}${current.detail ? "\n" : ""}- ${preset}`
+    }));
+  };
+
+  const submitQualityRequest = async () => {
+    if (!memberId) {
+      onRequireAuth?.();
+      return;
+    }
+    if (!qualityRequestType) return;
+
+    const config = qualityRequestConfigs[qualityRequestType];
+    const name = qualityRequestForm.name.trim();
+    const detail = qualityRequestForm.detail.trim();
+    if (!name) {
+      setQualityRequestStatus(`${config.nameLabel}을 적어주세요.`);
+      return;
+    }
+    if (!detail) {
+      setQualityRequestStatus(`${config.detailLabel}을 한 줄이라도 적어주세요.`);
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const area = qualityRequestForm.area.trim() || String(selectedMapDestination);
+    const report: PlaceReport = {
+      id: `quality-${qualityRequestType}-${Date.now()}`,
+      createdAt: now,
+      updatedAt: now,
+      status: "검토중",
+      city: selectedMapDestination,
+      reporterType: "여행 준비중",
+      reporterId: memberId,
+      name: `${config.reportNamePrefix}: ${name}`,
+      googleMapsUri:
+        qualityRequestForm.googleMapsUri.trim() ||
+        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name} ${area} ${selectedMapDestination}`)}`,
+      area,
+      category: config.reportCategory,
+      priceLevel: "보통",
+      reason: `[${config.eyebrow}] ${detail}`,
+      mapReflectionStatus: "검토중",
+      viewCount: 0,
+      rewardPoints: qualityRequestType === "partner" ? 15 : 10
+    };
+
+    try {
+      setQualityRequestSubmitting(true);
+      await Promise.resolve(onSubmitPlaceReport(report));
+      setQualityRequestStatus("접수됐어요. 마이페이지의 내 제보 현황에서 검토 상태를 확인할 수 있어요.");
+      setQualityRequestForm(createQualityRequestForm());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "잠시 후 다시 시도해주세요.";
+      setQualityRequestStatus(`저장에 실패했어요. ${message}`);
+    } finally {
+      setQualityRequestSubmitting(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View pointerEvents="none" style={styles.nightScanline} />
       <View pointerEvents="none" style={styles.neonSweep} />
-      <ScrollView style={styles.phone} contentContainerStyle={styles.phoneContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={[styles.phone, isDesktop && styles.phoneDesktop]}
+        contentContainerStyle={[styles.phoneContent, isDesktop && styles.phoneContentDesktop]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.topBar}>
           <View style={styles.brandLockup}>
             <BrandLogo size={62} />
@@ -214,54 +394,76 @@ export function HomeScreen({
               <Text style={styles.subBrand}>베트남 여행자 현지맵</Text>
             </View>
           </View>
-          <Pressable accessibilityRole="button" onPress={() => onOpenPlaces(selectedCategory.filterId, selectedMapDestination)} style={styles.searchButton}>
+          <Pressable accessibilityRole="button" onPress={openPopularPlaces} style={styles.searchButton}>
             <Text style={styles.searchIcon}>⌕</Text>
           </Pressable>
+        </View>
+
+        <View style={styles.topSavedSection}>
+          <View style={styles.topSavedHeader}>
+            <View style={styles.topSavedHeaderCopy}>
+              <Text style={styles.topSavedEyebrow}>오늘의 선택</Text>
+              <Text style={styles.topSavedTitle}>오늘 한국인이 가장 많이 저장한 장소</Text>
+              <Text style={styles.topSavedCopy}>사진, 후기, 최근 확인 상태를 먼저 보고 실패 확률 낮은 곳부터 고르세요.</Text>
+            </View>
+            <Text style={styles.topSavedBadge}>{topSavedPlaces.length}곳</Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topSavedRail}>
+            {topSavedPlaces.map((place, index) => (
+              <TopSavedPlaceCard
+                key={place.id}
+                place={place}
+                rank={index + 1}
+                onPress={() => {
+                  trackEvent("view_place", { placeId: place.id, source: "home_top_saved", city: selectedMapDestination });
+                  onOpenPlaces(getMapCategoryIdFromPlace(place), selectedMapDestination);
+                }}
+              />
+            ))}
+          </ScrollView>
         </View>
 
         <View style={styles.todayPanel}>
           <View style={styles.todayHeader}>
             <View style={styles.todayHeaderCopy}>
-              <Text style={styles.todayEyebrow}>오늘의 망고맵</Text>
-              <Text style={styles.todayTitle}>지금 {selectedMapDestination}에서 뜨는 것</Text>
-              <Text style={styles.todayCopy}>핫플, 모임, 장터, 생활톡을 한 번에 확인해요.</Text>
+              <Text style={styles.todayEyebrow}>{selectedMapDestination} 여행중?</Text>
+              <Text style={styles.todayTitle}>한국인들이 직접 저장한 맛집 · 마사지 · 카페만 모았습니다.</Text>
+              <Text style={styles.todayCopy}>실패 없는 여행지 찾기</Text>
             </View>
             <View style={styles.todayReactionBadge}>
-              <Text style={styles.todayReactionValue}>{todayReactionCount.toLocaleString("ko-KR")}</Text>
-              <Text style={styles.todayReactionLabel}>반응</Text>
+              <Text style={styles.todayReactionValue}>한국어</Text>
+              <Text style={styles.todayReactionLabel}>후기 지도</Text>
             </View>
           </View>
 
-          <View style={styles.todayQuickGrid}>
-            <TodayQuickCard title="열린 모임" value={homeActivity.meetupCount > 0 ? `${homeActivity.meetupCount}개 열림` : "오늘 합류"} copy="식사·카페·이동 동행" onPress={onOpenTravel} />
-            <TodayQuickCard title="방금 올라온 장터" value={homeActivity.marketCount > 0 ? `${homeActivity.marketCount}개 판매중` : "여행템 거래"} copy="유심·티켓·생활용품" onPress={onOpenMarketplace} />
-            <TodayQuickCard title="생활톡" value={homeActivity.talkCount > 0 ? `${homeActivity.talkCount}개 대화` : "현지 질문"} copy="숙소·교통·주의사항" onPress={onOpenTravel} />
-            <TodayQuickCard title="스팟 제보" value={homeActivity.reportCount > 0 ? `${homeActivity.reportCount}건 제보` : "망고단 기여"} copy="좋은 장소를 지도에 반영" onPress={onOpenReport} />
+          <View style={styles.heroCtaRow}>
+            <Pressable accessibilityRole="button" onPress={openNearbyPlaces} style={styles.heroPrimaryCta}>
+              <Text style={styles.heroPrimaryText}>내 주변 장소 보기</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={openPopularPlaces} style={styles.heroSecondaryCta}>
+              <Text style={styles.heroSecondaryText}>인기 장소 보기</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.trustSignalGrid}>
+            <TrustSignalCard title="한국어 후기 기반" value="맛·가격·분위기" copy="한국인 여행자 기준으로 실패 확률을 줄여요." />
+            <TrustSignalCard title="최근 확인된 장소" value="영업·주소 체크" copy="방문 전 바뀐 정보가 있는지 확인해요." />
+            <TrustSignalCard title="여행자/현지인 제보" value="검토 후 반영" copy="좋은 장소와 오류 제보를 지도 품질로 쌓아요." onPress={openReportFromHome} />
           </View>
 
           <View style={styles.todayHotList}>
-            {homeActivity.latestItems.length > 0 ? (
-              <View style={styles.todayLiveFeed}>
-                <Text style={styles.todayLiveTitle}>방금 올라온 활동</Text>
-                {homeActivity.latestItems.map((item) => (
-                  <TodayActivityRow
-                    key={`${item.type}-${item.id}`}
-                    item={item}
-                    onPress={item.type === "market" ? onOpenMarketplace : item.type === "report" ? onOpenReport : onOpenTravel}
-                  />
-                ))}
-              </View>
-            ) : null}
             <View style={styles.todaySectionHeader}>
-              <Text style={styles.todaySectionTitle}>오늘의 핫플 TOP 3</Text>
-              <Text style={styles.todaySectionMeta}>망고단 반응순</Text>
+              <Text style={styles.todaySectionTitle}>최근 한국인 후기</Text>
+              <Text style={styles.todaySectionMeta}>방문 팁</Text>
             </View>
-            {todayHotPlaces.map((place, index) => (
-              <TodayHotSpotRow
-                key={place.id}
-                place={place}
-                rank={index + 1}
-                onPress={() => onOpenPlaces(getMapCategoryIdFromPlace(place), selectedMapDestination)}
+            {recentKoreanReviews.map((item) => (
+              <RecentKoreanReviewCard
+                key={item.id}
+                item={item}
+                onPress={() => {
+                  trackEvent("view_place", { placeId: item.place.id, source: "home_recent_review", city: selectedMapDestination });
+                  onOpenPlaces(getMapCategoryIdFromPlace(item.place), selectedMapDestination);
+                }}
               />
             ))}
           </View>
@@ -304,8 +506,11 @@ export function HomeScreen({
                   onPress={() => setSelectedCategoryId(category.id)}
                   style={[styles.categoryChip, selected && { borderColor: category.dot, backgroundColor: `${category.dot}24` }]}
                 >
-                  <View style={[styles.categoryDot, { backgroundColor: category.dot }]} />
-                  <Text style={[styles.categoryText, selected && styles.categoryTextActive]}>{category.label}</Text>
+                  <Text style={styles.categoryEmoji}>{getHomeCategoryEmoji(category.id)}</Text>
+                  <View style={styles.categoryTextWrap}>
+                    <Text style={[styles.categoryText, selected && styles.categoryTextActive]}>{category.label}</Text>
+                    <Text style={styles.categoryCount}>{countHomeCategoryPlaces(selectedMapDestination, category)}곳</Text>
+                  </View>
                 </Pressable>
               );
             })}
@@ -322,7 +527,11 @@ export function HomeScreen({
             <View>
               <Text style={styles.sheetEyebrow}>{visibleFocusedPlace ? "탐색에서 선택한 장소" : "오늘의 여행 레이어"}</Text>
               <Text style={styles.sheetTitle}>{visibleFocusedPlace ? formatMapPlaceName(visibleFocusedPlace.name) : selectedCategory.label}</Text>
-              <Text style={styles.sheetCopy}>{visibleFocusedPlace ? `${visibleFocusedPlace.category} · ${visibleFocusedPlace.area ?? selectedMapDestination}` : selectedCategory.copy}</Text>
+              <Text style={styles.sheetCopy}>
+                {visibleFocusedPlace
+                  ? `${visibleFocusedPlace.category} · ${visibleFocusedPlace.area ?? selectedMapDestination}`
+                  : `${selectedCategory.copy} · 확대하면 더 많은 장소가 보여요`}
+              </Text>
             </View>
             <View style={[styles.sheetIcon, { backgroundColor: selectedCategory.dot }]}>
               <Text style={styles.sheetIconText}>{selectedCategory.icon}</Text>
@@ -330,9 +539,9 @@ export function HomeScreen({
           </View>
 
           <View style={styles.statRow}>
-            <InfoPill label="후보" value={`${selectedCategoryCount}곳`} />
+            <InfoPill label="전체 후보" value={`${selectedCategoryCount}곳`} />
+            <InfoPill label="지도 표시" value={`${selectedMapMarkerCount}곳`} />
             <InfoPill label="날씨" value={formatWeatherValue(liveInfo)} />
-            <InfoPill label="업데이트" value="오늘" />
           </View>
 
           <View style={styles.actionRow}>
@@ -346,8 +555,8 @@ export function HomeScreen({
             >
               <Text style={styles.primaryActionText}>{visibleFocusedPlace ? "같은 카테고리 보기" : "자세히 보기"}</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" onPress={onOpenTravel} style={styles.secondaryAction}>
-              <Text style={styles.secondaryActionText}>모임</Text>
+            <Pressable accessibilityRole="button" onPress={openReportFromHome} style={styles.secondaryAction}>
+              <Text style={styles.secondaryActionText}>제보</Text>
             </Pressable>
           </View>
         </View>
@@ -355,24 +564,53 @@ export function HomeScreen({
         <View style={styles.communityPanel}>
           <View style={styles.communityHeader}>
             <View>
-              <Text style={styles.communityEyebrow}>여행자 커뮤니티</Text>
-              <Text style={styles.communityTitle}>지도에서 보고, 사람들과 해결하기</Text>
+              <Text style={styles.communityEyebrow}>망고맵 품질</Text>
+              <Text style={styles.communityTitle}>한국인 기준으로 더 정확해지는 지도</Text>
             </View>
-            <Text style={styles.communityLive}>{liveCount}개 후보</Text>
+            <Text style={styles.communityLive}>검토중</Text>
           </View>
           <View style={styles.communityGrid}>
-            <CommunityAction title="번개모임" copy="식사·카페·이동 동행" badge="방입장" onPress={onOpenTravel} />
-            <CommunityAction title="중고장터" copy="유심·티켓·여행용품" badge="거래" onPress={onOpenMarketplace} />
-            <CommunityAction title="스팟제보" copy="현지 추천 장소 올리기" badge="기여" onPress={onOpenReport} />
+            <CommunityAction
+              title="장소 제보"
+              copy="새 장소나 주소·영업시간·사진 오류를 알려주세요."
+              badge="지도 품질"
+              actionLabel="제보하기"
+              onPress={openReportFromHome}
+            />
+            <CommunityAction
+              title="업체/혜택 제안"
+              copy="한국인에게 보여줄 만한 매장과 혜택을 추천해주세요."
+              badge="제휴 후보"
+              actionLabel="제안하기"
+              onPress={() => openQualityRequest("partner")}
+            />
+            <CommunityAction
+              title="정보 수정 요청"
+              copy="폐업, 이전, 가격 변동을 검토 요청할 수 있어요."
+              badge="검토"
+              actionLabel="수정 요청"
+              onPress={() => openQualityRequest("correction")}
+            />
           </View>
         </View>
 
       </ScrollView>
+      <QualityRequestSheet
+        requestType={qualityRequestType}
+        city={selectedMapDestination}
+        form={qualityRequestForm}
+        status={qualityRequestStatus}
+        submitting={qualityRequestSubmitting}
+        onChange={updateQualityRequestForm}
+        onClose={closeQualityRequest}
+        onPresetPress={addQualityRequestPreset}
+        onSubmit={submitQualityRequest}
+      />
     </SafeAreaView>
   );
 }
 
-function CommunityAction({ title, copy, badge, onPress }: { title: string; copy: string; badge: string; onPress: () => void }) {
+function CommunityAction({ title, copy, badge, actionLabel, onPress }: { title: string; copy: string; badge: string; actionLabel: string; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.communityCard}>
       <View style={styles.communityCardTop}>
@@ -380,6 +618,135 @@ function CommunityAction({ title, copy, badge, onPress }: { title: string; copy:
         <Text style={styles.communityBadge}>{badge}</Text>
       </View>
       <Text style={styles.communityCardCopy}>{copy}</Text>
+      <Text style={styles.communityActionText}>{actionLabel}</Text>
+    </Pressable>
+  );
+}
+
+function QualityRequestSheet({
+  requestType,
+  city,
+  form,
+  status,
+  submitting,
+  onChange,
+  onClose,
+  onPresetPress,
+  onSubmit
+}: {
+  requestType: QualityRequestType | null;
+  city: Destination;
+  form: QualityRequestForm;
+  status: string;
+  submitting: boolean;
+  onChange: (updates: Partial<QualityRequestForm>) => void;
+  onClose: () => void;
+  onPresetPress: (preset: string) => void;
+  onSubmit: () => void;
+}) {
+  if (!requestType) return null;
+
+  const config = qualityRequestConfigs[requestType];
+
+  return (
+    <Modal transparent visible animationType="fade" onRequestClose={onClose}>
+      <View style={styles.qualityOverlay}>
+        <Pressable accessibilityRole="button" onPress={onClose} style={styles.qualityBackdrop} />
+        <View style={styles.qualitySheet}>
+          <View style={styles.qualityHandle} />
+          <View style={styles.qualityHeader}>
+            <View style={styles.qualityHeaderCopy}>
+              <Text style={styles.qualityEyebrow}>{config.eyebrow}</Text>
+              <Text style={styles.qualityTitle}>{config.title}</Text>
+              <Text style={styles.qualityCopy}>{config.copy}</Text>
+            </View>
+            <Pressable accessibilityRole="button" onPress={onClose} style={styles.qualityCloseButton}>
+              <Text style={styles.qualityCloseText}>닫기</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.qualityForm}>
+            <View style={styles.qualityContextBox}>
+              <Text style={styles.qualityContextLabel}>현재 도시</Text>
+              <Text style={styles.qualityContextValue}>{city}</Text>
+            </View>
+
+            <Text style={styles.qualityLabel}>{config.nameLabel}</Text>
+            <TextInput
+              value={form.name}
+              onChangeText={(text) => onChange({ name: text })}
+              placeholder={config.namePlaceholder}
+              placeholderTextColor="rgba(35,44,59,0.46)"
+              style={styles.qualityInput}
+            />
+
+            <Text style={styles.qualityLabel}>지역/주소</Text>
+            <TextInput
+              value={form.area}
+              onChangeText={(text) => onChange({ area: text })}
+              placeholder="예: 1군 벤탄 근처, 다낭 미케비치 앞"
+              placeholderTextColor="rgba(35,44,59,0.46)"
+              style={styles.qualityInput}
+            />
+
+            <Text style={styles.qualityLabel}>Google Maps 링크 <Text style={styles.qualityOptional}>(선택)</Text></Text>
+            <TextInput
+              value={form.googleMapsUri}
+              onChangeText={(text) => onChange({ googleMapsUri: text })}
+              placeholder="링크가 있으면 검토가 더 빨라요"
+              placeholderTextColor="rgba(35,44,59,0.46)"
+              style={styles.qualityInput}
+              autoCapitalize="none"
+            />
+
+            <Text style={styles.qualityLabel}>{config.detailLabel}</Text>
+            <View style={styles.qualityPresetRail}>
+              {config.presets.map((preset) => (
+                <Pressable key={preset} accessibilityRole="button" onPress={() => onPresetPress(preset)} style={styles.qualityPresetChip}>
+                  <Text style={styles.qualityPresetText}>{preset}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <TextInput
+              value={form.detail}
+              onChangeText={(text) => onChange({ detail: text })}
+              placeholder={config.detailPlaceholder}
+              placeholderTextColor="rgba(35,44,59,0.46)"
+              style={[styles.qualityInput, styles.qualityTextArea]}
+              multiline
+              textAlignVertical="top"
+            />
+
+            {status ? <Text style={styles.qualityStatusText}>{status}</Text> : null}
+
+            <Pressable
+              accessibilityRole="button"
+              disabled={submitting}
+              onPress={onSubmit}
+              style={[styles.qualitySubmitButton, submitting && styles.qualitySubmitButtonDisabled]}
+            >
+              <Text style={styles.qualitySubmitText}>{submitting ? "저장 중..." : "검토 요청 보내기"}</Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function TrustSignalCard({ title, value, copy, onPress }: { title: string; value: string; copy: string; onPress?: () => void }) {
+  const content = (
+    <View style={styles.trustSignalCard}>
+      <Text style={styles.trustSignalTitle}>{title}</Text>
+      <Text style={styles.trustSignalValue}>{value}</Text>
+      <Text style={styles.trustSignalCopy}>{copy}</Text>
+    </View>
+  );
+
+  if (!onPress) return content;
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress}>
+      {content}
     </Pressable>
   );
 }
@@ -394,6 +761,35 @@ function TodayQuickCard({ title, value, copy, onPress }: { title: string; value:
   );
 }
 
+function TopSavedPlaceCard({ place, rank, onPress }: { place: CuratedPlace; rank: number; onPress: () => void }) {
+  const imageUrl = getFocusedPlaceImageUrl(place);
+  const reviewCount = getHomeKoreanReviewCount(place);
+
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.topSavedCard}>
+      <View style={styles.topSavedImageWrap}>
+        {imageUrl ? (
+          <Image source={{ uri: imageUrl }} style={styles.topSavedImage} resizeMode="cover" />
+        ) : (
+          <View style={styles.topSavedImageEmpty}>
+            <Text style={styles.topSavedImageEmptyText}>사진 준비중</Text>
+          </View>
+        )}
+        <Text style={styles.topSavedRank}>{rank}</Text>
+      </View>
+      <View style={styles.topSavedCardBody}>
+        <Text style={styles.topSavedCategory}>{getDisplayHomeCategory(place.category)}</Text>
+        <Text style={styles.topSavedPlaceName} numberOfLines={2}>{formatMapPlaceName(place.name)}</Text>
+        <View style={styles.topSavedMetaRow}>
+          <Text style={styles.topSavedRating}>★ {formatHomePlaceRating(place)}</Text>
+          <Text style={styles.topSavedMeta}>한국인 후기 {reviewCount}개</Text>
+        </View>
+        <Text style={styles.topSavedVerified}>{formatHomeVerifiedLabel(place)}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
 function TodayHotSpotRow({ place, rank, onPress }: { place: CuratedPlace; rank: number; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.todayHotRow}>
@@ -401,10 +797,28 @@ function TodayHotSpotRow({ place, rank, onPress }: { place: CuratedPlace; rank: 
       <View style={styles.todayHotCopy}>
         <Text style={styles.todayHotTitle} numberOfLines={1}>{formatMapPlaceName(place.name)}</Text>
         <Text style={styles.todayHotMeta} numberOfLines={1}>
-          망고단 추천 {getMangoRecommendationCount(place)} · 댓글 {getMangoCommentCount(place)}
+          평점 {formatHomePlaceRating(place)} · {place.area || place.city} · 최근 확인
         </Text>
       </View>
-      <Text style={styles.todayHotCategory}>{place.category}</Text>
+      <Text style={styles.todayHotCategory}>{getDisplayHomeCategory(place.category)}</Text>
+    </Pressable>
+  );
+}
+
+function RecentKoreanReviewCard({ item, onPress }: { item: HomeReviewItem; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.recentReviewCard}>
+      <View style={styles.recentReviewAvatar}>
+        <Text style={styles.recentReviewAvatarText}>{item.nickname.slice(0, 1)}</Text>
+      </View>
+      <View style={styles.recentReviewCopy}>
+        <View style={styles.recentReviewTop}>
+          <Text style={styles.recentReviewName}>{item.nickname}</Text>
+          <Text style={styles.recentReviewRating}>{"●".repeat(Math.max(1, Math.min(5, Math.round(item.rating))))}</Text>
+        </View>
+        <Text style={styles.recentReviewText} numberOfLines={2}>{item.content}</Text>
+        <Text style={styles.recentReviewPlace} numberOfLines={1}>{formatMapPlaceName(item.place.name)} · {item.tags.slice(0, 2).join(" · ")}</Text>
+      </View>
     </Pressable>
   );
 }
@@ -427,8 +841,66 @@ function countHomeCategoryPlaces(destination: MapDestination, category: MapCateg
   return count || cityCounts[category.id] || 0;
 }
 
+function countHomeMappableCategoryPlaces(destination: MapDestination, category: MapCategory) {
+  return getHomeSafeMapPlaces(destination, category.id).length;
+}
+
+function getHomeCategoryEmoji(categoryId: string) {
+  const emojis: Record<string, string> = {
+    food: "🍜",
+    cafe: "☕",
+    massage: "💆",
+    market: "🛍️",
+    exchange: "💱",
+    photo: "📍"
+  };
+  return emojis[categoryId] ?? "📌";
+}
+
+function getHomeKoreanReviewCount(place: CuratedPlace) {
+  return Math.max(place.reviews?.length ?? 0, place.koreanReviewSignal?.reviewCount ?? 0, getMangoCommentCount(place));
+}
+
+function formatHomeVerifiedLabel(place: CuratedPlace) {
+  if (!place.lastVerifiedAt) return "최근 확인 준비중";
+  const verifiedAt = new Date(`${place.lastVerifiedAt}T00:00:00`);
+  if (Number.isNaN(verifiedAt.getTime())) return "최근 확인 준비중";
+  const today = new Date();
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const verifiedMidnight = new Date(verifiedAt.getFullYear(), verifiedAt.getMonth(), verifiedAt.getDate());
+  const diffDays = Math.max(0, Math.floor((todayMidnight.getTime() - verifiedMidnight.getTime()) / 86400000));
+  if (diffDays === 0) return "오늘 확인";
+  if (diffDays === 1) return "1일 전 확인";
+  if (diffDays <= 30) return `${diffDays}일 전 확인`;
+  return `${verifiedAt.getMonth() + 1}/${verifiedAt.getDate()} 확인`;
+}
+
+function buildRecentKoreanReviews(places: CuratedPlace[]): HomeReviewItem[] {
+  return places
+    .flatMap((place) =>
+      (place.reviews ?? []).slice(0, 2).map((review, index) => ({
+        id: `${place.id}-${index}`,
+        place,
+        nickname: review.nickname || "여행자",
+        rating: review.rating || 5,
+        content: review.content,
+        tags: review.tags ?? []
+      }))
+    )
+    .filter((item) => item.content.trim().length > 0)
+    .slice(0, 4);
+}
+
 function getTodayHotScore(place: CuratedPlace) {
-  return getMangoRecommendationCount(place) * 4 + getMangoCommentCount(place) * 3 + (place.rating ?? 0) * 12 + Math.min(place.userRatingCount ?? 0, 5000) / 100;
+  const koreanSignal = (place.koreanReviewSignal?.score ?? 0) * 10;
+  const mangoReviewWeight = getHomeKoreanReviewCount(place) * 18;
+  const savedWeight = getMangoRecommendationCount(place) * 8;
+  return (place.rating ?? 0) * 18 + koreanSignal + mangoReviewWeight + savedWeight;
+}
+
+function formatHomePlaceRating(place: CuratedPlace) {
+  const rating = place.rating ?? 4.5;
+  return rating.toFixed(1);
 }
 
 async function loadHomeActivitySnapshot(destination: MapDestination): Promise<HomeActivitySnapshot> {
@@ -539,17 +1011,36 @@ function matchHomeCategory(place: CuratedPlace, categoryId: string) {
   if (categoryId === "food") return place.category === "맛집";
   if (categoryId === "cafe") return place.category === "카페";
   if (categoryId === "massage") return place.category === "마사지";
-  if (categoryId === "rooftop") return place.category === "바/루프탑";
   if (categoryId === "market") return place.category === "쇼핑";
-  if (categoryId === "photo") return place.category === "사진명소";
   if (categoryId === "exchange") return place.category === "환전";
-  if (categoryId === "karaoke") return place.category === "가라오케";
+  if (categoryId === "photo") return ["사진명소", "바/루프탑", "가라오케", "투어/액티비티"].includes(place.category);
   return false;
 }
 
 function hasSafeHomeMapCoordinates(place: CuratedPlace, destination: MapDestination) {
-  if (!place.coordinates) return false;
-  return isCoordinateInsideDestination(destination, place.coordinates.latitude, place.coordinates.longitude);
+  const coordinates = getHomeMapCoordinates(place);
+  if (!coordinates) return false;
+  return isCoordinateInsideDestination(destination, coordinates.lat, coordinates.lng);
+}
+
+function hasUsableHomeMapCoordinates(place: CuratedPlace) {
+  return Boolean(getHomeMapCoordinates(place));
+}
+
+function getHomeMapCoordinates(place: CuratedPlace) {
+  const coordinates = place.coordinates as
+    | {
+        latitude?: number;
+        longitude?: number;
+        lat?: number;
+        lng?: number;
+      }
+    | undefined;
+  if (!coordinates) return undefined;
+  const lat = Number(coordinates.latitude ?? coordinates.lat);
+  const lng = Number(coordinates.longitude ?? coordinates.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+  return { lat, lng };
 }
 
 function getMapCategoryIdFromPlace(place: CuratedPlace) {
@@ -557,11 +1048,11 @@ function getMapCategoryIdFromPlace(place: CuratedPlace) {
     맛집: "food",
     카페: "cafe",
     마사지: "massage",
-    "바/루프탑": "rooftop",
+    "바/루프탑": "photo",
     쇼핑: "market",
     사진명소: "photo",
     환전: "exchange",
-    가라오케: "karaoke",
+    가라오케: "photo",
     "투어/액티비티": "photo"
   };
   return categoryMap[place.category] ?? "food";
@@ -573,6 +1064,10 @@ function formatMapPlaceName(name: string) {
     .replace(/\s*&\s*(vegetarian|vegan).*$/i, "")
     .replace(/\s{2,}/g, " ")
     .trim();
+}
+
+function getDisplayHomeCategory(category: CuratedPlace["category"]) {
+  return category === "사진명소" ? "관광명소" : category;
 }
 
 function InteractiveHomeMap({ html }: { html: string }) {
@@ -623,7 +1118,7 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
       food: [{ title: "Hai's Restaurant", sub: "베트남 맛집" }, { title: "A Taste of Saigon", sub: "벤탄 근처 맛집" }, { title: "Phở Việt Nam", sub: "쌀국수" }],
       cafe: [{ title: "XLIII Coffee", sub: "스페셜티 카페" }, { title: "Okkio Cafe", sub: "감성 카페" }, { title: "Maison Marou", sub: "디저트 카페" }],
       rooftop: [{ title: "Saigon Saigon Rooftop", sub: "루프탑 바" }, { title: "Bui Vien Walking Street", sub: "밤거리" }],
-      photo: [{ title: "Cafe Apartment", sub: "사진명소" }, { title: "Nguyen Hue Street", sub: "산책·사진" }],
+      photo: [{ title: "Cafe Apartment", sub: "관광명소" }, { title: "Nguyen Hue Street", sub: "산책·사진" }],
       market: [{ title: "Ben Thanh Market", sub: "시장·기념품" }, { title: "Saigon Square", sub: "쇼핑" }],
       exchange: [{ title: "Ha Tam Jewelry", sub: "환전 후보" }, { title: "Kim Mai Gold", sub: "환전 후보" }],
       massage: [{ title: "Golden Lotus Spa", sub: "마사지" }, { title: "Moc Huong Spa", sub: "마사지" }],
@@ -653,7 +1148,7 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
       food: [{ title: "Bún Chả Hương Liên", sub: "분짜" }, { title: "Phở Thìn", sub: "쌀국수" }, { title: "Bánh Mì 25", sub: "반미" }],
       cafe: [{ title: "Cafe Giảng", sub: "전통 커피" }, { title: "Loading T Cafe", sub: "감성 카페" }, { title: "The Note Coffee", sub: "사진 카페" }],
       rooftop: [{ title: "Ta Hien Beer Street", sub: "맥주거리" }, { title: "Summit Lounge", sub: "루프탑" }],
-      photo: [{ title: "Hoan Kiem Lake", sub: "산책·사진" }, { title: "Train Street", sub: "사진명소" }],
+      photo: [{ title: "Hoan Kiem Lake", sub: "산책·사진" }, { title: "Train Street", sub: "관광명소" }],
       market: [{ title: "Dong Xuan Market", sub: "시장" }, { title: "Hang Gai Street", sub: "쇼핑" }],
       exchange: [{ title: "Quoc Trinh Gold", sub: "환전 후보" }, { title: "Ha Trung Street Exchange", sub: "환전 거리" }],
       massage: [{ title: "SF Spa Hanoi", sub: "마사지" }, { title: "La Spa Hanoi", sub: "마사지" }],
@@ -663,7 +1158,7 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
       food: [{ title: "Bánh Căn Nhà Chung", sub: "달랏 로컬 맛집" }, { title: "Lẩu Gà Lá É Tao Ngộ", sub: "닭전골" }, { title: "Artist Alley", sub: "분위기 맛집" }],
       cafe: [{ title: "Kokoro Cafe", sub: "사진 카페" }, { title: "Still Cafe", sub: "감성 카페" }, { title: "Túi Mơ To", sub: "전망 카페" }],
       rooftop: [{ title: "Maze Bar", sub: "밤 코스" }, { title: "Dalat Night Market", sub: "야시장" }],
-      photo: [{ title: "Dalat Railway Station", sub: "사진명소" }, { title: "Linh Phuoc Pagoda", sub: "관광 사진" }],
+      photo: [{ title: "Dalat Railway Station", sub: "관광명소" }, { title: "Linh Phuoc Pagoda", sub: "관광 사진" }],
       market: [{ title: "Dalat Market", sub: "시장" }, { title: "Dalat Night Market", sub: "야시장" }],
       exchange: [{ title: "Dalat Gold Shop", sub: "환전 후보" }, { title: "Hoa Binh Area Exchange", sub: "환전 후보" }],
       massage: [{ title: "Dalat Spa", sub: "마사지" }, { title: "Herbal Spa Dalat", sub: "마사지" }],
@@ -673,17 +1168,23 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
       food: [{ title: "Xin Chào Restaurant", sub: "해산물" }, { title: "Ra Khơi", sub: "로컬 해산물" }, { title: "Crab House", sub: "크랩" }],
       cafe: [{ title: "Chuồn Chuồn Bistro", sub: "전망 카페" }, { title: "Son Tra Hill Coffee", sub: "카페" }, { title: "Phu Quoc Coffee House", sub: "휴식 카페" }],
       rooftop: [{ title: "Sunset Sanato", sub: "선셋 바" }, { title: "OCSEN Beach Bar", sub: "비치 바" }],
-      photo: [{ title: "Sunset Town", sub: "사진명소" }, { title: "Sao Beach", sub: "해변 사진" }],
+      photo: [{ title: "Sunset Town", sub: "관광명소" }, { title: "Sao Beach", sub: "해변 사진" }],
       market: [{ title: "Phu Quoc Night Market", sub: "야시장" }, { title: "Duong Dong Market", sub: "시장" }],
       exchange: [{ title: "Duong Dong Gold Shop", sub: "환전 후보" }, { title: "Phu Quoc Money Exchange", sub: "환전 후보" }],
       massage: [{ title: "Luna Thai Spa", sub: "마사지" }, { title: "La Veranda Spa", sub: "마사지" }],
       karaoke: [{ title: "Karaoke Phu Quoc Center", sub: "가라오케" }]
     }
   };
-  const [lat, lng] = cityCenter[destination];
+  const focusedCoordinates = focusedPlace ? getHomeMapCoordinates(focusedPlace) : undefined;
+  const focusCenter = focusedCoordinates
+    ? ([focusedCoordinates.lat, focusedCoordinates.lng] as [number, number])
+    : undefined;
+  const [lat, lng] = focusCenter ?? cityCenter[destination];
   const baseZoom = cityZoom[destination];
-  const selectedMarkerLimit = Math.max(24, Math.min(getHomeSafeMapPlaces(destination, selectedCategory.id).length, 120));
-  const initialSelectedMarkerLimit = Math.min(selectedMarkerLimit, destination === "호치민" ? 48 : 34);
+  const initialZoom = focusCenter ? 16 : baseZoom;
+  const focusedZoom = destination === "푸꾸옥" || destination === "호치민" ? 16 : 17;
+  const selectedMarkerLimit = Math.max(24, Math.min(getHomeSafeMapPlaces(destination, selectedCategory.id).length, 160));
+  const initialSelectedMarkerLimit = Math.min(selectedMarkerLimit, destination === "호치민" ? 36 : 28);
   const markers = mapCategories.flatMap((category) =>
     getGoogleBackedMapSpots(destination, category, citySpots[destination][category.id] ?? [], category.id === selectedCategory.id ? selectedMarkerLimit : 3).map((spot, index) => {
       const activeCategory = category.id === selectedCategory.id;
@@ -705,8 +1206,8 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
         bestTime: spot.bestTime,
         checkHint: spot.checkHint,
         labelVisible: activeCategory && index < 4,
-        visibleFromZoom: activeCategory ? (index < initialSelectedMarkerLimit ? baseZoom : index < 88 ? baseZoom + 1 : baseZoom + 2) : baseZoom + 1,
-        labelFromZoom: activeCategory ? (index < 4 ? baseZoom : index < 14 ? baseZoom + 1 : 16) : 16,
+        visibleFromZoom: activeCategory ? (index < initialSelectedMarkerLimit ? baseZoom : index < 88 ? baseZoom + 1 : baseZoom + 2) : baseZoom + 2,
+        labelFromZoom: activeCategory ? (index < 4 ? baseZoom : index < 12 ? baseZoom + 1 : 16) : 16,
         lat: spot.coordinates.lat,
         lng: spot.coordinates.lng,
         color: category.dot
@@ -717,28 +1218,29 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
     ...marker,
     active: marker.id === selectedCategory.id
   }));
-  const focusMarker = focusedPlace?.coordinates
+  const focusedMapPlace = focusedPlace && focusedCoordinates ? focusedPlace : undefined;
+  const focusMarker = focusedMapPlace && focusedCoordinates
     ? {
         id: "focused",
-        title: formatMapPlaceName(focusedPlace.name),
-        sub: `${focusedPlace.category} · ${focusedPlace.area ?? destination}`,
-        description: buildMapPlaceDescription(focusedPlace),
-        imageUrl: getFocusedPlaceImageUrl(focusedPlace),
-        lat: focusedPlace.coordinates.latitude,
-        lng: focusedPlace.coordinates.longitude,
+        title: formatMapPlaceName(focusedMapPlace.name),
+        sub: `${getDisplayHomeCategory(focusedMapPlace.category)} · ${focusedMapPlace.area ?? destination}`,
+        description: buildMapPlaceDescription(focusedMapPlace),
+        imageUrl: getFocusedPlaceImageUrl(focusedMapPlace),
+        lat: focusedCoordinates.lat,
+        lng: focusedCoordinates.lng,
         color: selectedCategory.dot,
         active: true,
-        mapsUri: focusedPlace.googleMapsUri,
-        query: `${focusedPlace.name} ${destination}`,
-        rating: focusedPlace.rating,
-        reviewCount: focusedPlace.userRatingCount,
-        mangoRecommendationCount: getMangoRecommendationCount(focusedPlace),
-        mangoCommentCount: getMangoCommentCount(focusedPlace),
-        priceLevel: focusedPlace.priceLevel,
-        area: focusedPlace.area,
-        address: getHomeMapAddressLabel(destination, focusedPlace),
-        bestTime: focusedPlace.bestTime[0],
-        checkHint: getMapPlaceCheckHint(focusedPlace),
+        mapsUri: focusedMapPlace.googleMapsUri,
+        query: `${focusedMapPlace.name} ${destination}`,
+        rating: focusedMapPlace.rating,
+        reviewCount: getMangoCommentCount(focusedMapPlace),
+        mangoRecommendationCount: getMangoRecommendationCount(focusedMapPlace),
+        mangoCommentCount: getMangoCommentCount(focusedMapPlace),
+        priceLevel: focusedMapPlace.priceLevel,
+        area: focusedMapPlace.area,
+        address: getHomeMapAddressLabel(destination, focusedMapPlace),
+        bestTime: focusedMapPlace.bestTime[0],
+        checkHint: getMapPlaceCheckHint(focusedMapPlace),
         labelVisible: true,
         visibleFromZoom: 0,
         labelFromZoom: 0
@@ -861,6 +1363,9 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
       background-image: linear-gradient(135deg, #FFF7DF, #FFD36B);
       background-position: center;
       background-size: cover;
+    }
+    .place-photo-empty {
+      background-image: linear-gradient(135deg, #FFF9E8, #FFE7A8);
     }
     .place-photo span {
       display: inline-flex;
@@ -1001,14 +1506,12 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
       .replace(/'/g, "&#039;");
     const formatRatingMeta = (marker) => typeof marker.rating === "number" ? "★ " + marker.rating.toFixed(1) : undefined;
     const formatReviewMeta = (marker) => {
-      const count = Number(marker.reviewCount || 0);
+      const count = Number(marker.mangoCommentCount || 0);
       if (!count) return undefined;
-      if (count >= 10000) return "리뷰 " + (Math.round(count / 1000) / 10) + "만+";
-      if (count >= 1000) return "리뷰 " + Math.round(count / 100) / 10 + "천+";
-      return "리뷰 " + count.toLocaleString("ko-KR") + "+";
+      return "망고리뷰 " + count.toLocaleString("ko-KR") + "개";
     };
-    const formatMangoMeta = (marker) => Number(marker.mangoRecommendationCount || 0) ? "망고단 추천 " + Number(marker.mangoRecommendationCount).toLocaleString("ko-KR") : undefined;
-    const formatCommentMeta = (marker) => Number(marker.mangoCommentCount || 0) ? "댓글 " + Number(marker.mangoCommentCount).toLocaleString("ko-KR") : undefined;
+    const formatMangoMeta = (marker) => marker.checkHint ? marker.checkHint : "한국어 맥락 정리";
+    const formatCommentMeta = () => undefined;
     function renderFallback(message) {
       document.getElementById("map").innerHTML =
         "<div class='fallback'>" +
@@ -1068,7 +1571,7 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
     window.initMangoMap = () => {
       const map = new google.maps.Map(document.getElementById("map"), {
         center: { lat: ${lat}, lng: ${lng} },
-        zoom: ${cityZoom[destination]},
+        zoom: ${initialZoom},
         disableDefaultUI: false,
         fullscreenControl: false,
         mapTypeControl: false,
@@ -1103,7 +1606,7 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
       const addressLine = marker.address || "";
         const googleMarker = new google.maps.Marker({
           position: { lat: marker.lat, lng: marker.lng },
-          map: marker.id === "focused" || marker.visibleFromZoom <= ${baseZoom} ? map : null,
+          map: marker.id === "focused" || marker.visibleFromZoom <= ${initialZoom} ? map : null,
           title: marker.title,
           zIndex: marker.id === "focused" ? 30 : marker.active ? 20 : 5,
           icon: getMarkerIcon(marker, false)
@@ -1133,9 +1636,12 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
         }
         const markerEntry = { data: marker, marker: googleMarker };
         googleMarkers.push(markerEntry);
+        const photoHtml = marker.imageUrl
+          ? "<div class='place-photo' data-image-url='" + escapeHtml(marker.imageUrl) + "'><span>사진 보기</span></div>"
+          : "<div class='place-photo place-photo-empty'><span>사진 준비중</span></div>";
         const popupHtml =
         "<div class='place-popup'>" +
-          "<div class='place-photo' data-image-url='" + escapeHtml(marker.imageUrl) + "'><span>사진 보기</span></div>" +
+          photoHtml +
           "<div class='place-body'>" +
             "<div class='place-kicker'>" + escapeHtml(marker.sub) + "</div>" +
             "<div class='place-title'>" + escapeHtml(marker.title) + "</div>" +
@@ -1155,8 +1661,11 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
       syncMarkerVisibility();
       if (focusedGoogleMarker) {
         map.setCenter(focusedGoogleMarker.position);
-        map.setZoom(${Math.min(Number(cityZoom[destination]) + 1, 15)});
-        openPopupForMarker(map, focusedGoogleMarker, focusedGoogleMarker.html);
+        map.setZoom(${focusedZoom});
+        google.maps.event.addListenerOnce(map, "idle", () => {
+          openPopupForMarker(map, focusedGoogleMarker, focusedGoogleMarker.html);
+          window.setTimeout(() => map.panBy(0, -120), 80);
+        });
       }
     };
 
@@ -1206,24 +1715,30 @@ function getGoogleBackedMapSpots(
     .slice(0, limit);
 
   if (places.length > 0) {
-    return places.map((place) => ({
-      title: formatMapPlaceName(place.name),
-      sub: `${place.category}${place.area ? ` · ${place.area}` : ""}`,
-      description: buildMapPlaceDescription(place),
-      imageUrl: getFocusedPlaceImageUrl(place),
-      mapsUri: place.googleMapsUri,
-      query: `${place.name} ${destination}`,
-      coordinates: { lat: place.coordinates!.latitude, lng: place.coordinates!.longitude },
-      address: getHomeMapAddressLabel(destination, place),
-      rating: place.rating,
-      reviewCount: place.userRatingCount,
-      mangoRecommendationCount: getMangoRecommendationCount(place),
-      mangoCommentCount: getMangoCommentCount(place),
-      priceLevel: place.priceLevel,
-      area: place.area,
-      bestTime: place.bestTime[0],
-      checkHint: getMapPlaceCheckHint(place)
-    }));
+    return places
+      .map((place) => {
+        const coordinates = getHomeMapCoordinates(place);
+        if (!coordinates) return undefined;
+        return {
+          title: formatMapPlaceName(place.name),
+          sub: `${getDisplayHomeCategory(place.category)}${place.area ? ` · ${place.area}` : ""}`,
+          description: buildMapPlaceDescription(place),
+          imageUrl: getFocusedPlaceImageUrl(place),
+          mapsUri: place.googleMapsUri,
+          query: `${place.name} ${destination}`,
+          coordinates,
+          address: getHomeMapAddressLabel(destination, place),
+          rating: place.rating,
+          reviewCount: getMangoCommentCount(place),
+          mangoRecommendationCount: getMangoRecommendationCount(place),
+          mangoCommentCount: getMangoCommentCount(place),
+          priceLevel: place.priceLevel,
+          area: place.area,
+          bestTime: place.bestTime[0],
+          checkHint: getMapPlaceCheckHint(place)
+        };
+      })
+      .filter((place): place is NonNullable<typeof place> => Boolean(place));
   }
 
   return [];
@@ -1289,14 +1804,14 @@ function getHomeMapPriority(place: CuratedPlace) {
 
 function buildMapSpotDescription(destination: MapDestination, category: MapCategory, spotLabel: string) {
   const categoryCopy: Record<string, string> = {
-    food: "식사 동선에 넣기 좋은 후보예요. 피크 시간에는 대기 가능성이 있어요.",
-    cafe: "더운 낮이나 이동 사이에 쉬어가기 좋은 카페 후보예요.",
+    food: "식사 동선에 넣기 좋은 장소예요. 피크 시간에는 대기 가능성이 있어요.",
+    cafe: "더운 낮이나 이동 사이에 쉬어가기 좋은 카페예요.",
     massage: "많이 걷는 날 중간 회복 코스로 넣기 좋아요. 예약 가능 여부를 먼저 보세요.",
     rooftop: "저녁 이후 분위기 전환용으로 보기 좋아요. 귀가는 Grab Car를 추천해요.",
-    market: "기념품과 간식 쇼핑을 한 번에 보기 좋은 동선 후보예요.",
+    market: "기념품과 간식 쇼핑을 한 번에 보기 좋은 장소예요.",
     photo: "사진 남기기 좋은 곳이라 낮 시간대 방문을 먼저 추천해요.",
     exchange: "환율과 지급액을 현장에서 비교하고 소액부터 바꾸는 편이 좋아요.",
-    karaoke: "밤 일정 후보예요. 룸 요금과 음료 포함 여부를 먼저 확인하세요."
+    karaoke: "밤 일정 전에 룸 요금과 음료 포함 여부를 먼저 확인하세요."
   };
 
   return `${destination} ${spotLabel}. ${categoryCopy[category.id] ?? category.copy}`;
@@ -1304,11 +1819,12 @@ function buildMapSpotDescription(destination: MapDestination, category: MapCateg
 
 function getFocusedPlaceImageUrl(place: CuratedPlace) {
   const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
-  if (apiKey && place.photoName) {
-    return `https://places.googleapis.com/v1/${place.photoName}/media?maxWidthPx=640&key=${apiKey}`;
+  const photoName = place.photoNames?.[0] ?? place.photoName;
+  if (apiKey && photoName) {
+    return `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=640&key=${apiKey}`;
   }
 
-  return getHomeMapImageUrl(place.city, getMapCategoryIdFromPlace(place), place.id);
+  return "";
 }
 
 function buildMapPlaceDescription(place: CuratedPlace) {
@@ -1318,38 +1834,49 @@ function buildMapPlaceDescription(place: CuratedPlace) {
 
   if (place.category === "맛집") {
     if (name.includes("unatoto") || name.includes("うな") || tags.includes("장어")) return "장어덮밥·구이로 빠르게 한 끼 잡기 좋은 식당";
-    if (tags.includes("한국식중식") || name.includes("jjambbong") || name.includes("jjamppong")) return "짬뽕·중식 메뉴가 당길 때 보기 좋은 한식 중식 후보";
-    if (tags.includes("브런치") || name.includes("brunch") || name.includes("breakfast")) return "늦은 아침이나 가벼운 점심으로 넣기 좋은 브런치 후보";
+    if (tags.includes("한국식중식") || name.includes("jjambbong") || name.includes("jjamppong")) return "짬뽕·중식 메뉴가 당길 때 보기 좋은 한식 중식 장소";
+    if (tags.includes("브런치") || name.includes("brunch") || name.includes("breakfast")) return "늦은 아침이나 가벼운 점심으로 넣기 좋은 브런치 장소";
     if (tags.includes("해산물") || name.includes("seafood") || name.includes("crab")) return "해산물 메뉴를 중심으로 저녁 코스에 넣기 좋은 식당";
-    if (tags.includes("쌀국수") || name.includes("pho")) return "쌀국수 한 그릇으로 가볍게 들르기 좋은 현지식 후보";
-    if (tags.includes("반미") || name.includes("banh mi")) return "이동 중 간단히 먹기 좋은 반미·간편식 후보";
+    if (tags.includes("쌀국수") || name.includes("pho")) return "쌀국수 한 그릇으로 가볍게 들르기 좋은 현지식 장소";
+    if (tags.includes("반미") || name.includes("banh mi")) return "이동 중 간단히 먹기 좋은 반미·간편식 장소";
     if (tags.includes("채식가능") || name.includes("vegan") || name.includes("vegetarian")) return "채식 메뉴 선택지가 있어 식단 맞추기 좋은 식당";
     if (place.priceLevel === "저렴") return "가격 부담 낮게 한 끼 해결하기 좋은 가성비 식당";
-    if (place.priceLevel === "프리미엄") return "조금 더 좋은 분위기로 식사 잡기 좋은 프리미엄 후보";
+    if (place.priceLevel === "프리미엄") return "조금 더 좋은 분위기로 식사 잡기 좋은 프리미엄 장소";
     if (firstBestTime) return `${firstBestTime} 시간대에 동선 중간 식사로 넣기 좋은 맛집`;
-    return "평점과 위치를 보고 한 끼 후보로 넣기 좋은 식당";
+    return "평점과 위치를 보고 한 끼 장소로 넣기 좋은 식당";
   }
 
   if (place.category === "카페") {
     if (tags.includes("사진맛집") || tags.includes("뷰맛집")) return "사진 찍고 쉬어가기 좋은 분위기 카페";
     if (tags.includes("디저트")) return "커피와 디저트로 쉬어가기 좋은 카페";
     if (place.rainyDayOk) return "비 오거나 더울 때 실내 대피용으로 좋은 카페";
-    return "동선 중간에 쉬어가기 좋은 카페 후보";
+    return "동선 중간에 쉬어가기 좋은 카페";
   }
 
   if (place.category === "마사지") {
     if (place.priceLevel === "프리미엄") return "컨디션 회복용으로 잡기 좋은 프리미엄 스파";
     if (place.priceLevel === "저렴") return "걷는 일정 중간에 부담 없이 넣기 좋은 마사지";
-    return "많이 걷는 날 중간 휴식으로 넣기 좋은 마사지 후보";
+    return "많이 걷는 날 중간 휴식으로 넣기 좋은 마사지";
   }
 
   if (place.category === "바/루프탑") return "저녁 이후 분위기 전환용으로 보기 좋은 밤 코스";
-  if (place.category === "환전") return "여행 경비 준비 전 환율을 비교해보기 좋은 후보";
+  if (place.category === "환전") return "여행 경비 준비 전 환율을 비교해보기 좋은 장소";
   if (place.category === "쇼핑") return "기념품과 간식 쇼핑을 한 번에 보기 좋은 장소";
-  if (place.category === "사진명소") return "짧게 들러 사진 남기기 좋은 스팟";
-  if (place.category === "가라오케") return "밤 일정 전 가격과 룸 조건 확인이 필요한 후보";
+  if (place.category === "사진명소") return "대표 관광명소를 짧게 둘러보기 좋은 스팟";
+  if (place.category === "가라오케") return "밤 일정 전 가격과 룸 조건 확인이 필요한 장소";
 
-  return place.oneLine || place.koreanTip;
+  return cleanHomePlaceCopy(place.oneLine || place.koreanTip);
+}
+
+function cleanHomePlaceCopy(value: string) {
+  return value
+    .replace(/\s*후보\s*/g, " ")
+    .replace(/피크 시간, 메뉴 사진, 최근 영업시간은 Google Maps에서 한 번 확인하세요\.?/g, "피크 시간대에는 대기 여부를 확인하면 좋아요.")
+    .replace(/최근 영업시간은 Google Maps에서 한 번 확인하세요\.?/g, "")
+    .replace(/Google Maps에서 한 번 확인하세요\.?/g, "")
+    .replace(/Google Places 기준으로 추가한\s*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function getMapPlaceCheckHint(place: CuratedPlace) {
@@ -1359,62 +1886,6 @@ function getMapPlaceCheckHint(place: CuratedPlace) {
   if (place.category === "바/루프탑" || place.category === "가라오케") return "밤 이동 Grab 추천";
   return place.beginnerSafe ? "초행자 무난" : "방문 전 확인";
 }
-
-function getHomeMapImageUrl(destination: MapDestination, categoryId: string, seed: string) {
-  const images = homeMapImages[categoryId] ?? homeMapImages.food;
-  return images[getStableMapImageIndex(`${destination}-${categoryId}-${seed}`, images.length)];
-}
-
-function getStableMapImageIndex(value: string, length: number) {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-  }
-  return hash % length;
-}
-
-const homeMapImages: Record<string, string[]> = {
-  food: [
-    "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=640&q=80",
-    "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=640&q=80",
-    "https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=640&q=80"
-  ],
-  cafe: [
-    "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=640&q=80",
-    "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=640&q=80",
-    "https://images.unsplash.com/photo-1511081692775-05d0f180a065?auto=format&fit=crop&w=640&q=80"
-  ],
-  massage: [
-    "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=640&q=80",
-    "https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&w=640&q=80",
-    "https://images.unsplash.com/photo-1600334129128-685c5582fd35?auto=format&fit=crop&w=640&q=80"
-  ],
-  rooftop: [
-    "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=640&q=80",
-    "https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?auto=format&fit=crop&w=640&q=80",
-    "https://images.unsplash.com/photo-1470337458703-46ad1756a187?auto=format&fit=crop&w=640&q=80"
-  ],
-  market: [
-    "https://images.unsplash.com/photo-1481437156560-3205f6a55735?auto=format&fit=crop&w=640&q=80",
-    "https://images.unsplash.com/photo-1502163140606-888448ae8cfe?auto=format&fit=crop&w=640&q=80",
-    "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=640&q=80"
-  ],
-  photo: [
-    "https://images.unsplash.com/photo-1583417319070-4a69db38a482?auto=format&fit=crop&w=640&q=80",
-    "https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=640&q=80",
-    "https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&w=640&q=80"
-  ],
-  exchange: [
-    "https://images.unsplash.com/photo-1601597111158-2fceff292cdc?auto=format&fit=crop&w=640&q=80",
-    "https://images.unsplash.com/photo-1567427017947-545c5f8d16ad?auto=format&fit=crop&w=640&q=80",
-    "https://images.unsplash.com/photo-1621504450181-5d356f61d307?auto=format&fit=crop&w=640&q=80"
-  ],
-  karaoke: [
-    "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=640&q=80",
-    "https://images.unsplash.com/photo-1526328828355-69b01701ca6a?auto=format&fit=crop&w=640&q=80",
-    "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=640&q=80"
-  ]
-};
 
 function InfoPill({ label, value }: { label: string; value: string }) {
   return (
@@ -1469,9 +1940,16 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     backgroundColor: "transparent"
   },
+  phoneDesktop: {
+    maxWidth: 1180
+  },
   phoneContent: {
     flexGrow: 1,
     paddingBottom: 112
+  },
+  phoneContentDesktop: {
+    paddingHorizontal: 28,
+    paddingBottom: 128
   },
   topBar: {
     zIndex: 5,
@@ -1510,9 +1988,9 @@ const styles = StyleSheet.create({
     marginTop: 2
   },
   searchButton: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.sunset,
@@ -1522,8 +2000,155 @@ const styles = StyleSheet.create({
   },
   searchIcon: {
     color: "#FFFFFF",
-    fontSize: 30,
-    lineHeight: 32,
+    fontSize: 24,
+    lineHeight: 26,
+    fontWeight: "900"
+  },
+  topSavedSection: {
+    marginHorizontal: 20,
+    marginBottom: 14,
+    borderRadius: 30,
+    paddingVertical: 17,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(255,194,51,0.22)",
+    ...shadow
+  },
+  topSavedHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingHorizontal: 17,
+    marginBottom: 13
+  },
+  topSavedHeaderCopy: {
+    flex: 1,
+    minWidth: 0
+  },
+  topSavedEyebrow: {
+    color: "#FF9F1C",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900"
+  },
+  topSavedTitle: {
+    color: colors.ink,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: "900",
+    marginTop: 3
+  },
+  topSavedCopy: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "800",
+    marginTop: 5
+  },
+  topSavedBadge: {
+    minWidth: 44,
+    color: colors.ink,
+    backgroundColor: "#FFD43B",
+    overflow: "hidden",
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    textAlign: "center",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  topSavedRail: {
+    gap: 12,
+    paddingHorizontal: 17,
+    paddingRight: 24
+  },
+  topSavedCard: {
+    width: 230,
+    borderRadius: 24,
+    overflow: "hidden",
+    backgroundColor: "#FFF8E6",
+    borderWidth: 1,
+    borderColor: "#EED69A"
+  },
+  topSavedImageWrap: {
+    height: 145,
+    backgroundColor: "#F4E6BD",
+    position: "relative"
+  },
+  topSavedImage: {
+    width: "100%",
+    height: "100%"
+  },
+  topSavedImageEmpty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  topSavedImageEmptyText: {
+    color: "#8A5A00",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  topSavedRank: {
+    position: "absolute",
+    left: 12,
+    top: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    overflow: "hidden",
+    backgroundColor: "#FFD43B",
+    color: colors.ink,
+    textAlign: "center",
+    lineHeight: 34,
+    fontSize: 15,
+    fontWeight: "900"
+  },
+  topSavedCardBody: {
+    padding: 13,
+    gap: 6
+  },
+  topSavedCategory: {
+    alignSelf: "flex-start",
+    color: "#07412A",
+    backgroundColor: "#EAF8EE",
+    overflow: "hidden",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "900"
+  },
+  topSavedPlaceName: {
+    color: colors.ink,
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: "900"
+  },
+  topSavedMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  topSavedRating: {
+    color: "#07412A",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900"
+  },
+  topSavedMeta: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "800"
+  },
+  topSavedVerified: {
+    color: "#9A6500",
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: "900"
   },
   controlPanel: {
@@ -1600,15 +2225,28 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   categoryChip: {
-    minHeight: 40,
-    borderRadius: 20,
+    minHeight: 50,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: "rgba(255,194,51,0.18)",
     backgroundColor: "#FFF4D8",
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
-    gap: 7
+    gap: 9
+  },
+  categoryEmoji: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    overflow: "hidden",
+    textAlign: "center",
+    lineHeight: 28,
+    backgroundColor: "#FFFDF5",
+    fontSize: 16
+  },
+  categoryTextWrap: {
+    minWidth: 0
   },
   categoryDot: {
     width: 9,
@@ -1623,6 +2261,13 @@ const styles = StyleSheet.create({
   },
   categoryTextActive: {
     color: colors.ink
+  },
+  categoryCount: {
+    color: colors.muted,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: "900",
+    marginTop: 1
   },
   mapCanvas: {
     height: 360,
@@ -1839,7 +2484,6 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   todayPanel: {
-    display: "none",
     marginHorizontal: 20,
     marginBottom: 14,
     borderRadius: 30,
@@ -1902,6 +2546,74 @@ const styles = StyleSheet.create({
     lineHeight: 13,
     fontWeight: "900"
   },
+  heroCtaRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 16
+  },
+  heroPrimaryCta: {
+    flex: 1,
+    minHeight: 54,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FF8A1F",
+    shadowColor: "#FF8A1F",
+    shadowOpacity: 0.30,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 9 }
+  },
+  heroSecondaryCta: {
+    flex: 1,
+    minHeight: 54,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,247,223,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,247,223,0.28)"
+  },
+  heroPrimaryText: {
+    color: "#271400",
+    fontSize: 15,
+    fontWeight: "900"
+  },
+  heroSecondaryText: {
+    color: "#FFF7DF",
+    fontSize: 15,
+    fontWeight: "900"
+  },
+  trustSignalGrid: {
+    gap: 9,
+    marginTop: 14
+  },
+  trustSignalCard: {
+    borderRadius: 18,
+    padding: 13,
+    backgroundColor: "rgba(255,247,223,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,247,223,0.18)"
+  },
+  trustSignalTitle: {
+    color: "#FFD43B",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900"
+  },
+  trustSignalValue: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: "900",
+    marginTop: 4
+  },
+  trustSignalCopy: {
+    color: "rgba(255,247,223,0.74)",
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "800",
+    marginTop: 4
+  },
   todayQuickGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1941,6 +2653,67 @@ const styles = StyleSheet.create({
   todayHotList: {
     gap: 9,
     marginTop: 15
+  },
+  recentReviewCard: {
+    minHeight: 84,
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 11,
+    backgroundColor: "rgba(255,247,223,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,247,223,0.16)"
+  },
+  recentReviewAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFD43B"
+  },
+  recentReviewAvatarText: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: "900"
+  },
+  recentReviewCopy: {
+    flex: 1,
+    minWidth: 0
+  },
+  recentReviewTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  recentReviewName: {
+    color: "#FFF7DF",
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: "900"
+  },
+  recentReviewRating: {
+    color: "#19A95B",
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "900"
+  },
+  recentReviewText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "900",
+    marginTop: 5
+  },
+  recentReviewPlace: {
+    color: "rgba(255,247,223,0.68)",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "800",
+    marginTop: 5
   },
   todayLiveFeed: {
     gap: 7,
@@ -2149,5 +2922,188 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontWeight: "800",
     marginTop: 6
+  },
+  communityActionText: {
+    alignSelf: "flex-start",
+    color: "#FF9500",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900",
+    marginTop: 10
+  },
+  qualityOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.34)"
+  },
+  qualityBackdrop: {
+    ...StyleSheet.absoluteFillObject
+  },
+  qualitySheet: {
+    maxHeight: "88%",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 10,
+    paddingHorizontal: 18,
+    paddingBottom: Platform.OS === "web" ? 20 : 28,
+    backgroundColor: "#FFF7DF",
+    borderWidth: 1,
+    borderColor: "rgba(255,194,51,0.34)",
+    shadowColor: "#4A2600",
+    shadowOpacity: 0.22,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: -8 }
+  },
+  qualityHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(35,44,59,0.18)",
+    marginBottom: 12
+  },
+  qualityHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,194,51,0.22)"
+  },
+  qualityHeaderCopy: {
+    flex: 1,
+    minWidth: 0
+  },
+  qualityEyebrow: {
+    color: "#FF9500",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900"
+  },
+  qualityTitle: {
+    color: colors.ink,
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: "900",
+    marginTop: 4
+  },
+  qualityCopy: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "800",
+    marginTop: 7
+  },
+  qualityCloseButton: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "rgba(255,255,255,0.72)",
+    borderWidth: 1,
+    borderColor: "rgba(255,194,51,0.22)"
+  },
+  qualityCloseText: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  qualityForm: {
+    paddingTop: 14,
+    paddingBottom: 8
+  },
+  qualityContextBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(255,194,51,0.22)",
+    marginBottom: 14
+  },
+  qualityContextLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  qualityContextValue: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  qualityLabel: {
+    color: colors.ink,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "900",
+    marginTop: 12,
+    marginBottom: 7
+  },
+  qualityOptional: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  qualityInput: {
+    minHeight: 52,
+    borderRadius: 17,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: colors.ink,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(255,194,51,0.36)",
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  qualityTextArea: {
+    minHeight: 112,
+    lineHeight: 20
+  },
+  qualityPresetRail: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 9
+  },
+  qualityPresetChip: {
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    backgroundColor: "rgba(255,194,51,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,194,51,0.32)"
+  },
+  qualityPresetText: {
+    color: "#8A5200",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  qualityStatusText: {
+    color: "#E85D04",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "900",
+    marginTop: 13
+  },
+  qualitySubmitButton: {
+    minHeight: 56,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 15,
+    backgroundColor: "#FF9500",
+    ...sunsetGlow
+  },
+  qualitySubmitButtonDisabled: {
+    opacity: 0.58
+  },
+  qualitySubmitText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900"
   }
 });

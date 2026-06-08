@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 
 import { AppShell } from "../components/AppShell";
 import { Header } from "../components/Header";
@@ -7,7 +7,7 @@ import { curatedPlaces } from "../data/places";
 import { colors, shadow } from "../styles/theme";
 import type { CuratedPlace, Destination, LiveTravelInfo, PlaceReport, PlannerInput } from "../types";
 import { openGoogleMapsPlace } from "../utils/googleMaps";
-import { formatMangoCommentChip, formatMangoRecommendationChip, getMangoCommentCount, getMangoRecommendationCount } from "../utils/placeCommunity";
+import { formatMangoCommentChip, formatMangoRecommendationChip, getMangoCommentCount, getMangoRecommendationCount, getMangoReviewCount } from "../utils/placeCommunity";
 
 type PlacesScreenProps = {
   input: PlannerInput;
@@ -48,6 +48,7 @@ type PlaceComment = {
   memberName: string;
   message: string;
   createdAt: string;
+  rating?: number;
 };
 
 const destinationTabs: Destination[] = ["호치민", "다낭", "나트랑", "하노이", "달랏", "푸꾸옥"];
@@ -60,7 +61,7 @@ const filters: Array<{ id: FilterId; label: string; match: (place: CuratedPlace)
   { id: "rooftop", label: "루프탑", match: (place) => place.category === "바/루프탑" || hasTag(place, ["루프탑", "칵테일", "클럽"]) },
   { id: "karaoke", label: "가라오케", match: (place) => place.category === "가라오케" },
   { id: "shopping", label: "쇼핑", match: (place) => place.category === "쇼핑" },
-  { id: "photo", label: "사진명소", match: (place) => place.category === "사진명소" },
+  { id: "photo", label: "관광명소", match: (place) => place.category === "사진명소" },
   { id: "exchange", label: "환전", match: (place) => place.category === "환전" },
   { id: "korean", label: "한식당", match: (place) => hasTag(place, ["한식당", "한국어가능", "한국인추천"]) || nameHas(place, ["korean", "bbq", "doya", "hanam"]) },
   { id: "chinese", label: "중식당", match: (place) => hasTag(place, ["중식당"]) || nameHas(place, ["chinese", "jjamppong", "jajang", "dim sum"]) },
@@ -89,6 +90,10 @@ export function PlacesScreen({
   const [showAll, setShowAll] = useState(false);
   const [comments, setComments] = useState<PlaceComment[]>(loadComments);
   const [commentDraft, setCommentDraft] = useState("");
+  const [commentRating, setCommentRating] = useState(5);
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 1024;
+  const appMaxWidth = isDesktop ? 1240 : 560;
 
   useEffect(() => {
     if (initialDestination) setSelectedCity(initialDestination);
@@ -128,16 +133,19 @@ export function PlacesScreen({
 
   if (selectedPlace) {
     return (
-      <AppShell>
+      <AppShell maxWidth={isDesktop ? 1160 : 560} horizontalPadding={isDesktop ? 32 : 20}>
         <PlaceDetail
           place={selectedPlace}
           saved={savedPlaceIds.includes(selectedPlace.id)}
           comments={comments.filter((comment) => comment.placeId === selectedPlace.id)}
           commentDraft={commentDraft}
+          commentRating={commentRating}
           onChangeComment={setCommentDraft}
+          onChangeCommentRating={setCommentRating}
           onBack={() => {
             setSelectedPlace(null);
             setCommentDraft("");
+            setCommentRating(5);
           }}
           onToggleSaved={() => onToggleSavedPlace(selectedPlace.id)}
           onOpenMap={() => onOpenMapPlace(selectedPlace)}
@@ -155,11 +163,13 @@ export function PlacesScreen({
                 placeId: selectedPlace.id,
                 memberName,
                 message,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                rating: commentRating
               },
               ...current
             ]);
             setCommentDraft("");
+            setCommentRating(5);
           }}
         />
       </AppShell>
@@ -167,10 +177,10 @@ export function PlacesScreen({
   }
 
   return (
-    <AppShell>
+    <AppShell maxWidth={appMaxWidth} horizontalPadding={isDesktop ? 32 : 20}>
       <Header eyebrow="탐색" title={`${selectedCity}의 ${selectedFilter.label}`} subtitle="망고맵 추천과 여행자 댓글을 한 번에 확인해요." />
 
-      <View style={styles.searchPanel}>
+      <View style={[styles.searchPanel, isDesktop && styles.searchPanelDesktop]}>
         <View style={styles.searchBox}>
           <Text style={styles.searchIcon}>⌕</Text>
           <TextInput
@@ -218,13 +228,16 @@ export function PlacesScreen({
         </Pressable>
       </View>
 
+      <View style={isDesktop ? styles.exploreDesktopLayout : undefined}>
+        <View style={isDesktop ? styles.exploreDesktopList : undefined}>
       <View style={styles.sectionBlock}>
         <Text style={styles.sectionTitle}>필수 메뉴</Text>
         <Text style={styles.sectionCopy}>{selectedCity}에서 먼저 보면 좋은 후보를 가로로 넘겨보세요.</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carouselTrack}>
           {mustVisit.map((place) => (
             <Pressable key={place.id} style={styles.heroCard} onPress={() => setSelectedPlace(place)}>
-              <ImageBackground source={{ uri: getPlaceImageUrl(place) }} style={styles.heroImage} imageStyle={styles.heroImageRadius}>
+              {getPlaceImageUrl(place) ? (
+              <ImageBackground source={{ uri: getPlaceImageUrl(place)! }} style={styles.heroImage} imageStyle={styles.heroImageRadius}>
                 <Pressable style={styles.saveBubble} onPress={() => onToggleSavedPlace(place.id)}>
                   <Text style={styles.saveBubbleText}>{savedPlaceIds.includes(place.id) ? "♥" : "♡"}</Text>
                 </Pressable>
@@ -232,6 +245,12 @@ export function PlacesScreen({
                   <Text style={styles.awardBadgeText}>망고픽</Text>
                 </View>
               </ImageBackground>
+              ) : (
+                <View style={[styles.heroImage, styles.photoEmpty, styles.heroImageRadius]}>
+                  <Text style={styles.photoEmptyTitle}>사진 준비중</Text>
+                  <Text style={styles.photoEmptyCopy}>실제 매장 사진이 확인되면 표시돼요.</Text>
+                </View>
+              )}
               <Text style={styles.guideBadge}>망고단 추천</Text>
               <Text style={styles.heroTitle} numberOfLines={2}>{place.name}</Text>
               <RatingLine place={place} />
@@ -246,7 +265,13 @@ export function PlacesScreen({
         <View style={styles.popularList}>
           {visibleList.map((place) => (
             <Pressable key={place.id} style={styles.popularRow} onPress={() => setSelectedPlace(place)}>
-              <Image source={{ uri: getPlaceImageUrl(place) }} style={styles.popularImage} />
+              {getPlaceImageUrl(place) ? (
+                <Image source={{ uri: getPlaceImageUrl(place)! }} style={styles.popularImage} />
+              ) : (
+                <View style={[styles.popularImage, styles.photoEmptySmall]}>
+                  <Text style={styles.photoEmptySmallText}>사진 준비중</Text>
+                </View>
+              )}
               <View style={styles.popularBody}>
                 <Text style={styles.guideBadgeSmall}>망고단</Text>
                 <Text style={styles.popularTitle} numberOfLines={2}>{place.name}</Text>
@@ -265,28 +290,18 @@ export function PlacesScreen({
           </Pressable>
         ) : null}
       </View>
-
-      <View style={styles.sectionBlock}>
-        <View style={styles.insightHeader}>
-          <Text style={styles.sectionTitle}>여행자 인사이트</Text>
-          <Text style={styles.insightCount}>{places.length}곳</Text>
         </View>
-        <View style={styles.insightCard}>
-          <Text style={styles.insightScore}>4.8</Text>
-          <View style={styles.insightBars}>
-            {["음식", "분위기", "가성비", "접근성"].map((label, index) => (
-              <View key={label} style={styles.insightBarRow}>
-                <Text style={styles.insightBarLabel}>{label}</Text>
-                <View style={styles.insightTrack}>
-                  <View style={[styles.insightFill, { width: `${88 - index * 7}%` }]} />
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
+        {isDesktop ? (
+          <DesktopExploreMapPanel
+            city={selectedCity}
+            places={places.slice(0, 6)}
+            onOpenPlace={setSelectedPlace}
+            onOpenMapPlace={onOpenMapPlace}
+          />
+        ) : null}
       </View>
 
-      {places[0] ? (
+      {!isDesktop && places[0] ? (
         <Pressable style={styles.floatingMapButton} onPress={() => onOpenMapPlace(places[0])}>
           <Text style={styles.floatingMapText}>⌖ 지도</Text>
         </Pressable>
@@ -295,12 +310,76 @@ export function PlacesScreen({
   );
 }
 
+function DesktopExploreMapPanel({
+  city,
+  places,
+  onOpenPlace,
+  onOpenMapPlace
+}: {
+  city: Destination;
+  places: CuratedPlace[];
+  onOpenPlace: (place: CuratedPlace) => void;
+  onOpenMapPlace: (place: CuratedPlace) => void;
+}) {
+  const [focusedPlaceId, setFocusedPlaceId] = useState<string | null>(places[0]?.id ?? null);
+
+  useEffect(() => {
+    setFocusedPlaceId(places[0]?.id ?? null);
+  }, [places]);
+
+  const focusedPlace = places.find((place) => place.id === focusedPlaceId) ?? places[0];
+  const mapUrl = focusedPlace ? getStaticMapUrl(focusedPlace, places) : undefined;
+
+  return (
+    <View style={styles.exploreMapPanel}>
+      <View style={styles.exploreMapHeader}>
+        <Text style={styles.exploreMapEyebrow}>MANGOMAP 지도</Text>
+        <Text style={styles.exploreMapTitle}>{city}에서 바로 비교</Text>
+      </View>
+      <View style={styles.exploreMapCanvas}>
+        {mapUrl ? (
+          <Image source={{ uri: mapUrl }} style={styles.exploreMapImage} />
+        ) : (
+          <View style={styles.exploreMapEmpty}>
+            <Text style={styles.exploreMapEmptyTitle}>지도 준비중</Text>
+            <Text style={styles.exploreMapEmptyCopy}>좌표가 있는 장소부터 지도에 표시돼요.</Text>
+          </View>
+        )}
+      </View>
+      {focusedPlace ? (
+        <View style={styles.exploreMapCard}>
+          <Text style={styles.exploreMapCardName} numberOfLines={2}>{focusedPlace.name}</Text>
+          <Text style={styles.exploreMapCardMeta}>{getDisplayCategory(focusedPlace.category)} · {formatRating(focusedPlace.rating)} · 망고맵 후기 {getMangoReviewCount(focusedPlace)}개</Text>
+          <View style={styles.exploreMapCardActions}>
+            <Pressable style={styles.exploreMapPrimaryButton} onPress={() => onOpenPlace(focusedPlace)}>
+              <Text style={styles.exploreMapPrimaryText}>상세보기</Text>
+            </Pressable>
+            <Pressable style={styles.exploreMapGhostButton} onPress={() => onOpenMapPlace(focusedPlace)}>
+              <Text style={styles.exploreMapGhostText}>지도 탭</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+      <View style={styles.exploreMapList}>
+        {places.slice(0, 5).map((place) => (
+          <Pressable key={place.id} style={[styles.exploreMapListItem, focusedPlace?.id === place.id && styles.exploreMapListItemActive]} onPress={() => setFocusedPlaceId(place.id)}>
+            <Text style={styles.exploreMapListName} numberOfLines={1}>{place.name}</Text>
+            <Text style={styles.exploreMapListMeta}>{getDisplayCategory(place.category)} · 후기 {getMangoReviewCount(place)}개</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function PlaceDetail({
   place,
   saved,
   comments,
   commentDraft,
+  commentRating,
   onChangeComment,
+  onChangeCommentRating,
   onBack,
   onToggleSaved,
   onOpenMap,
@@ -311,17 +390,25 @@ function PlaceDetail({
   saved: boolean;
   comments: PlaceComment[];
   commentDraft: string;
+  commentRating: number;
   onChangeComment: (value: string) => void;
+  onChangeCommentRating: (value: number) => void;
   onBack: () => void;
   onToggleSaved: () => void;
   onOpenMap: () => void;
   onOpenGoogleMaps: () => void;
   onSubmitComment: () => void;
 }) {
-  const defaultComments = buildDefaultComments(place);
+  const defaultComments = useMemo(() => buildDefaultComments(place), [place]);
+  const allComments = useMemo(() => [...comments, ...defaultComments], [comments, defaultComments]);
+  const displayRating = useMemo(() => getDisplayRatingFromComments(place, allComments), [place, allComments]);
+  const reviewBreakdown = useMemo(() => getRatingBreakdown(allComments), [allComments]);
   const galleryImages = useMemo(() => getPlaceImageUrls(place), [place]);
   const introParagraphs = useMemo(() => buildPlaceLongIntro(place), [place]);
   const featureBullets = useMemo(() => buildPlaceFeatures(place), [place]);
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 1024;
+  const galleryCardWidth = isDesktop ? 620 : Math.max(300, Math.min(width - 48, 430));
   const detailScrollRef = useRef<ScrollView | null>(null);
   const sectionOffsets = useRef<Record<"photos" | "overview" | "comments", number>>({
     photos: 0,
@@ -331,13 +418,15 @@ function PlaceDetail({
   const [activeDetailTab, setActiveDetailTab] = useState<"photos" | "overview" | "comments">("photos");
   const scrollToDetailSection = (section: "photos" | "overview" | "comments") => {
     setActiveDetailTab(section);
-    detailScrollRef.current?.scrollTo({
-      y: Math.max(sectionOffsets.current[section] - 8, 0),
-      animated: true
-    });
+    setTimeout(() => {
+      detailScrollRef.current?.scrollTo({
+        y: Math.max(sectionOffsets.current[section] - 10, 0),
+        animated: true
+      });
+    }, 0);
   };
   return (
-    <ScrollView ref={detailScrollRef} style={styles.detailPage} contentContainerStyle={styles.detailContent} stickyHeaderIndices={[1]}>
+    <ScrollView ref={detailScrollRef} style={styles.detailPage} contentContainerStyle={[styles.detailContent, isDesktop && styles.detailContentDesktop]} stickyHeaderIndices={[1]}>
       <View style={styles.detailTopBar}>
         <Pressable onPress={onBack} style={styles.backButton}>
           <Text style={styles.backButtonText}>‹</Text>
@@ -373,12 +462,13 @@ function PlaceDetail({
         <ScrollView
           horizontal
           decelerationRate="fast"
+          snapToInterval={galleryCardWidth + 12}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.detailPhotoTrack}
           style={styles.detailPhotoScroll}
         >
-          {galleryImages.map((uri, index) => (
-            <View key={`${uri}-${index}`} style={styles.detailPhotoFrame}>
+          {galleryImages.length > 0 ? galleryImages.map((uri, index) => (
+            <View key={`${uri}-${index}`} style={[styles.detailPhotoFrame, { width: galleryCardWidth }]}>
               <Image source={{ uri }} style={styles.detailImage} />
               {index === 0 ? (
                 <View style={styles.awardPhotoBadge}>
@@ -389,21 +479,47 @@ function PlaceDetail({
                 <Text style={styles.photoIndexText}>{index + 1} / {galleryImages.length}</Text>
               </View>
             </View>
-          ))}
+          )) : (
+            <View style={[styles.detailPhotoFrame, styles.detailPhotoEmptyFrame, { width: galleryCardWidth }]}>
+              <Text style={styles.photoEmptyTitle}>사진 준비중</Text>
+              <Text style={styles.photoEmptyCopy}>실제 매장 사진이 확인되면 이곳에 표시돼요.</Text>
+            </View>
+          )}
         </ScrollView>
-        <View style={styles.photoCountBadge}>
-          <Text style={styles.photoCountText}>▧ {galleryImages.length}</Text>
-        </View>
+        {galleryImages.length > 0 ? (
+          <View style={styles.photoCountBadge}>
+            <Text style={styles.photoCountText}>▧ {galleryImages.length}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.detailSection}>
         <Text style={styles.detailTitle}>{place.name}</Text>
-        <RatingLine place={place} large />
+        <RatingLine place={place} large rating={displayRating} reviewCount={allComments.length} />
         <Text style={styles.detailMeta}>{buildMeta(place)}</Text>
         <View style={styles.detailLinkRow}>
           <Pressable onPress={onOpenMap}><Text style={styles.detailLink}>지도에서 보기</Text></Pressable>
           <Pressable onPress={onOpenGoogleMaps}><Text style={styles.detailLink}>구글맵 열기</Text></Pressable>
         </View>
+        {isDesktop ? (
+          <View style={styles.detailDesktopRail}>
+            <View style={styles.detailRailCard}>
+              <Text style={styles.detailRailLabel}>최근 확인</Text>
+              <Text style={styles.detailRailValue}>{formatVerifiedDate(place.lastVerifiedAt)}</Text>
+            </View>
+            <View style={styles.detailRailCard}>
+              <Text style={styles.detailRailLabel}>영업시간</Text>
+              <Text style={styles.detailRailValue}>{formatOpeningHoursSummary(place)}</Text>
+            </View>
+            <View style={styles.detailRailCard}>
+              <Text style={styles.detailRailLabel}>전화번호</Text>
+              <Text style={styles.detailRailValue}>{formatPhoneNumber(place)}</Text>
+            </View>
+            <Pressable style={styles.detailRailPrimary} onPress={onOpenMap}>
+              <Text style={styles.detailRailPrimaryText}>MANGOMAP 지도에서 보기</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
 
       <View
@@ -440,19 +556,23 @@ function PlaceDetail({
       </View>
 
       <View style={styles.detailSection}>
-        <Text style={styles.detailSectionTitle}>여행자 인사이트</Text>
+        <Text style={styles.detailSectionTitle}>평점 시각화</Text>
         <View style={styles.reviewScoreCard}>
-          <View>
-            <Text style={styles.reviewBigScore}>{formatRating(place.rating)}</Text>
-            <Text style={styles.reviewScoreLabel}>매우 좋음</Text>
-            <RatingDots rating={place.rating ?? 4.6} />
+          <View style={styles.reviewScoreSummary}>
+            <Text style={styles.reviewBigScore}>{formatRating(displayRating)}</Text>
+            <Text style={styles.reviewScoreLabel}>{getRatingLabel(displayRating)}</Text>
+            <RatingDots rating={displayRating} />
+            <Text style={styles.reviewScoreSub}>{getReviewBasisLabel(allComments.length)}</Text>
           </View>
           <View style={styles.reviewBars}>
-            {["음식", "서비스", "분위기", "가성비"].map((label, index) => (
-              <View key={label} style={styles.reviewBarRow}>
-                <Text style={styles.reviewBarLabel}>{label}</Text>
+            {reviewBreakdown.map((row) => (
+              <View key={row.label} style={styles.reviewBarRow}>
+                <View style={styles.reviewBarHeader}>
+                  <Text style={styles.reviewBarLabel}>{row.label}</Text>
+                  <Text style={styles.reviewBarCount}>{row.count}</Text>
+                </View>
                 <View style={styles.reviewTrack}>
-                  <View style={[styles.reviewFill, { width: `${90 - index * 6}%` }]} />
+                  <View style={[styles.reviewFill, { width: `${row.percent}%` }]} />
                 </View>
               </View>
             ))}
@@ -468,28 +588,47 @@ function PlaceDetail({
       >
         <View style={styles.commentHeader}>
           <Text style={styles.detailSectionTitle}>망고단 댓글</Text>
-          <Text style={styles.commentCount}>{comments.length + getMangoCommentCount(place)}개</Text>
+          <Text style={styles.commentCount}>{allComments.length}개</Text>
         </View>
         <View style={styles.commentBox}>
-          <TextInput
-            value={commentDraft}
-            onChangeText={onChangeComment}
-            placeholder="다녀온 느낌이나 팁을 남겨주세요"
-            placeholderTextColor="#9CA3AF"
-            style={styles.commentInput}
-          />
-          <Pressable style={styles.commentSubmit} onPress={onSubmitComment}>
-            <Text style={styles.commentSubmitText}>등록</Text>
-          </Pressable>
+          <View style={styles.commentRatingPicker}>
+            <View style={styles.commentRatingTop}>
+              <Text style={styles.commentRatingLabel}>내 평점</Text>
+              <Text style={styles.commentRatingHint}>{getRatingLabel(commentRating)}</Text>
+            </View>
+            <View style={styles.commentRatingDots}>
+              {[1, 2, 3, 4, 5].map((score) => (
+                <Pressable
+                  key={score}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${score}점 선택`}
+                  onPress={() => onChangeCommentRating(score)}
+                  style={[styles.commentRatingDot, score <= commentRating && styles.commentRatingDotActive]}
+                />
+              ))}
+            </View>
+          </View>
+          <View style={styles.commentInputRow}>
+            <TextInput
+              value={commentDraft}
+              onChangeText={onChangeComment}
+              placeholder="가격, 맛, 분위기, 한국인 입장에서 좋았던 점을 남겨주세요"
+              placeholderTextColor="#9CA3AF"
+              style={styles.commentInput}
+            />
+            <Pressable style={styles.commentSubmit} onPress={onSubmitComment}>
+              <Text style={styles.commentSubmitText}>등록</Text>
+            </Pressable>
+          </View>
         </View>
-        {[...comments, ...defaultComments].slice(0, 8).map((comment) => (
+        {allComments.slice(0, 8).map((comment) => (
           <View key={comment.id} style={styles.commentCard}>
             <View style={styles.commentAvatar}>
               <Text style={styles.commentAvatarText}>{comment.memberName.slice(0, 1)}</Text>
             </View>
             <View style={styles.commentBody}>
               <Text style={styles.commentName}>{comment.memberName}</Text>
-              <RatingDots rating={4.8} small />
+              <RatingDots rating={comment.rating ?? place.rating ?? 4.6} small />
               <Text style={styles.commentMessage}>{comment.message}</Text>
             </View>
           </View>
@@ -508,12 +647,26 @@ function InfoItem({ title, value }: { title: string; value: string }) {
   );
 }
 
-function RatingLine({ place, compact = false, large = false }: { place: CuratedPlace; compact?: boolean; large?: boolean }) {
+function RatingLine({
+  place,
+  compact = false,
+  large = false,
+  rating,
+  reviewCount
+}: {
+  place: CuratedPlace;
+  compact?: boolean;
+  large?: boolean;
+  rating?: number;
+  reviewCount?: number;
+}) {
+  const displayRating = rating ?? place.rating ?? 4.6;
+  const mangoReviewCount = reviewCount ?? getMangoReviewCount(place);
   return (
     <View style={[styles.ratingLine, compact && styles.ratingLineCompact]}>
-      <Text style={[styles.ratingNumber, large && styles.ratingNumberLarge]}>{formatRating(place.rating)}</Text>
-      <RatingDots rating={place.rating ?? 4.6} small={compact} />
-      <Text style={[styles.ratingReviews, large && styles.ratingReviewsLarge]}>({formatCount(place.userRatingCount ?? getMangoRecommendationCount(place))})</Text>
+      <Text style={[styles.ratingNumber, large && styles.ratingNumberLarge]}>{formatRating(displayRating)}</Text>
+      <RatingDots rating={displayRating} small={compact} />
+      <Text style={[styles.ratingReviews, large && styles.ratingReviewsLarge]}>({formatCount(mangoReviewCount)})</Text>
     </View>
   );
 }
@@ -530,18 +683,76 @@ function RatingDots({ rating, small = false }: { rating: number; small?: boolean
 }
 
 function buildDefaultComments(place: CuratedPlace): PlaceComment[] {
+  const baseRating = Math.max(3, Math.min(5, Math.round(place.rating ?? 4.6)));
   const comments = [
-    `${place.area ?? place.city} 일정 중간에 넣기 좋아요. ${place.bestTime[0] ?? "방문 전"} 시간대 추천합니다.`,
-    `한국인 후기가 많은 편이라 처음 가는 사람도 부담이 적어요.`,
-    place.koreanReviewSignal?.summary ?? "망고단 기준으로 저장해둘 만한 후보예요."
+    {
+      message: `${place.area ?? place.city} 일정 중간에 넣기 좋아요. ${place.bestTime[0] ?? "방문 전"} 시간대 추천합니다.`,
+      rating: baseRating
+    },
+    {
+      message: `처음 가도 주문이나 동선이 크게 어렵지 않았어요. 피크 시간만 피하면 더 편합니다.`,
+      rating: Math.max(3, baseRating - 1)
+    },
+    {
+      message: place.koreanReviewSignal?.summary ?? "망고단 기준으로 저장해둘 만한 후보예요.",
+      rating: baseRating
+    }
   ];
-  return comments.map((message, index) => ({
+  return comments.map((comment, index) => ({
     id: `default-${place.id}-${index}`,
     placeId: place.id,
     memberName: index === 0 ? "망고단" : "여행자",
-    message,
-    createdAt: new Date().toISOString()
+    message: comment.message,
+    createdAt: new Date().toISOString(),
+    rating: comment.rating
   }));
+}
+
+function getDisplayRatingFromComments(place: CuratedPlace, reviewComments: PlaceComment[]) {
+  const ratings = getValidCommentRatings(reviewComments);
+  if (ratings.length === 0) return place.rating ?? 4.6;
+  const total = ratings.reduce((sum, rating) => sum + rating, 0);
+  return total / ratings.length;
+}
+
+function getRatingBreakdown(reviewComments: PlaceComment[]) {
+  const rows = [
+    { label: "훌륭함", score: 5, count: 0 },
+    { label: "좋음", score: 4, count: 0 },
+    { label: "보통", score: 3, count: 0 },
+    { label: "아쉬움", score: 2, count: 0 },
+    { label: "비추천", score: 1, count: 0 }
+  ];
+  getValidCommentRatings(reviewComments).forEach((rating) => {
+    const normalized = Math.max(1, Math.min(5, Math.round(rating)));
+    const row = rows.find((item) => item.score === normalized);
+    if (row) row.count += 1;
+  });
+  const total = rows.reduce((sum, row) => sum + row.count, 0);
+  return rows.map((row) => ({
+    label: row.label,
+    count: row.count,
+    percent: total > 0 && row.count > 0 ? Math.max(4, Math.round((row.count / total) * 100)) : 0
+  }));
+}
+
+function getValidCommentRatings(reviewComments: PlaceComment[]) {
+  return reviewComments
+    .map((comment) => comment.rating)
+    .filter((rating): rating is number => typeof rating === "number" && Number.isFinite(rating) && rating >= 1 && rating <= 5);
+}
+
+function getRatingLabel(rating: number) {
+  const rounded = Math.round(rating);
+  if (rounded >= 5) return "훌륭함";
+  if (rounded === 4) return "좋음";
+  if (rounded === 3) return "보통";
+  if (rounded === 2) return "아쉬움";
+  return "비추천";
+}
+
+function getReviewBasisLabel(count: number) {
+  return count > 0 ? `망고맵 후기 ${count}개 기준` : "망고맵 후기 대기";
 }
 
 function getPlaceImageUrl(place: CuratedPlace) {
@@ -550,25 +761,35 @@ function getPlaceImageUrl(place: CuratedPlace) {
     return `https://places.googleapis.com/v1/${place.photoName}/media?maxWidthPx=720&key=${apiKey}`;
   }
 
-  const category = normalizeCategory(place);
-  const pool = fallbackImages[category] ?? fallbackImages.food;
-  const index = Math.abs(hashString(place.id)) % pool.length;
-  return pool[index];
+  return undefined;
 }
 
 function getPlaceImageUrls(place: CuratedPlace) {
-  const category = normalizeCategory(place);
-  const pool = fallbackImages[category] ?? fallbackImages.food;
-  const startIndex = Math.abs(hashString(place.id)) % pool.length;
-  const orderedFallbacks = Array.from({ length: pool.length }, (_, index) => pool[(startIndex + index) % pool.length]);
-  const images = [getPlaceImageUrl(place), ...orderedFallbacks].filter(Boolean);
+  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const photoNames = [...(place.photoNames ?? []), place.photoName].filter((photoName): photoName is string => Boolean(photoName));
+  const images = apiKey
+    ? photoNames.map((photoName) => `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=980&key=${apiKey}`)
+    : [];
   return Array.from(new Set(images)).slice(0, 6);
+}
+
+function getStaticMapUrl(place: CuratedPlace, nearbyPlaces: CuratedPlace[]) {
+  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!apiKey || !place.coordinates) return undefined;
+  const center = `${place.coordinates.latitude},${place.coordinates.longitude}`;
+  const markers = nearbyPlaces
+    .filter((item) => item.coordinates)
+    .slice(0, 8)
+    .map((item) => `markers=color:0xFF9F1C%7C${item.coordinates!.latitude},${item.coordinates!.longitude}`)
+    .join("&");
+  return `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=13&size=640x520&scale=2&maptype=roadmap&${markers}&key=${apiKey}`;
 }
 
 function buildPlaceLongIntro(place: CuratedPlace) {
   const area = place.area ?? place.city;
   const times = place.bestTime.length > 0 ? place.bestTime.join("이나 ") : "식사 전후";
   const tags = place.tags.slice(0, 4).join(" · ");
+  const tip = cleanPlaceCopy(place.koreanTip);
   const categoryIntro =
     place.category === "바/루프탑"
       ? "야경과 분위기를 같이 챙기고 싶은 날에 어울리는 곳이에요. 해가 지는 시간대에 가면 사진과 대화 흐름이 자연스럽고, 2차 장소로도 쓰기 좋습니다."
@@ -581,9 +802,9 @@ function buildPlaceLongIntro(place: CuratedPlace) {
             : "여행 동선 중간에 넣어두기 좋은 장소예요. 방문 목적과 이동 시간을 같이 맞춰보면 일정 완성도가 올라갑니다.";
 
   return [
-    place.oneLine,
+    cleanPlaceCopy(place.oneLine),
     `${area} 근처에서 ${times}에 들르기 좋은 후보입니다. ${categoryIntro}`,
-    `${place.koreanTip} 망고맵에서는 ${tags || "후기, 위치, 접근성"} 기준으로 정리했으니, 저장해두고 근처에 있을 때 다시 확인하기 좋아요.`
+    `${tip || "동선과 분위기를 함께 보고 고르면 실패 확률이 낮은 장소예요."} ${tags ? `${tags} 포인트를 함께 확인해보세요.` : "저장해두고 근처에 있을 때 다시 확인하기 좋아요."}`
   ];
 }
 
@@ -603,14 +824,44 @@ function buildPlaceFeatures(place: CuratedPlace) {
     {
       icon: "ⓘ",
       title: "특징",
-      copy: place.tags.slice(0, 5).join(" · ") || place.category
+      copy: place.tags.slice(0, 5).join(" · ") || getDisplayCategory(place.category)
     },
     {
       icon: "☎",
       title: "문의",
-      copy: "구글맵에서 최신 전화번호, 메뉴, 영업시간을 함께 확인하세요."
+      copy: formatPhoneNumber(place)
     }
   ];
+}
+
+function cleanPlaceCopy(value?: string) {
+  return String(value ?? "")
+    .replace(/Google 리뷰 기준으로?/g, "")
+    .replace(/Google Maps? 기준으로?/gi, "")
+    .replace(/구글맵 기준으로?/g, "")
+    .replace(/실제 주소 기준으로?/g, "")
+    .replace(/영업시간 기준으로?/g, "")
+    .replace(/리뷰 수가 많아/g, "")
+    .replace(/평점이 높아/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function formatOpeningHoursSummary(place: CuratedPlace) {
+  if (Array.isArray(place.openingHoursText) && place.openingHoursText.length > 0) {
+    return place.openingHoursText[0].replace(/\s+/g, " ");
+  }
+  if (typeof place.openNow === "boolean") return place.openNow ? "영업 중" : "영업 종료";
+  return "업데이트 예정";
+}
+
+function formatPhoneNumber(place: CuratedPlace) {
+  return place.internationalPhoneNumber || place.nationalPhoneNumber || "업데이트 예정";
+}
+
+function formatVerifiedDate(value?: string) {
+  if (!value) return "업데이트 예정";
+  return value.slice(0, 10);
 }
 
 function normalizeCategory(place: CuratedPlace) {
@@ -622,13 +873,17 @@ function normalizeCategory(place: CuratedPlace) {
   return "food";
 }
 
+function getDisplayCategory(category: CuratedPlace["category"]) {
+  return category === "사진명소" ? "관광명소" : category;
+}
+
 function scorePlace(place: CuratedPlace) {
   return (place.rating ?? 4.3) * 100 + (place.userRatingCount ?? 0) / 100 + getMangoRecommendationCount(place);
 }
 
 function buildMeta(place: CuratedPlace) {
   const price = place.priceLevel === "저렴" ? "$" : place.priceLevel === "프리미엄" ? "$$$" : "$$";
-  const category = place.category === "맛집" ? "음식점" : place.category;
+  const category = place.category === "맛집" ? "음식점" : getDisplayCategory(place.category);
   const area = place.area ?? place.city;
   return `${price} · ${category} · ${place.tags.slice(0, 2).join(" · ")} · ${area}`;
 }
@@ -675,10 +930,6 @@ function formatCount(value: number) {
   return `${value}`;
 }
 
-function hashString(value: string) {
-  return value.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
-}
-
 function loadComments(): PlaceComment[] {
   if (typeof localStorage === "undefined") return [];
   try {
@@ -698,35 +949,6 @@ function saveComments(comments: PlaceComment[]) {
   }
 }
 
-const fallbackImages: Record<string, string[]> = {
-  food: [
-    "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=900&q=80",
-    "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=900&q=80",
-    "https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=900&q=80"
-  ],
-  cafe: [
-    "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=900&q=80",
-    "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=80",
-    "https://images.unsplash.com/photo-1511081692775-05d0f180a065?auto=format&fit=crop&w=900&q=80"
-  ],
-  massage: [
-    "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=900&q=80",
-    "https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&w=900&q=80"
-  ],
-  night: [
-    "https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=900&q=80",
-    "https://images.unsplash.com/photo-1566417713940-fe7c737a9ef2?auto=format&fit=crop&w=900&q=80"
-  ],
-  shopping: [
-    "https://images.unsplash.com/photo-1481437156560-3205f6a55735?auto=format&fit=crop&w=900&q=80",
-    "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=900&q=80"
-  ],
-  photo: [
-    "https://images.unsplash.com/photo-1583417319070-4a69db38a482?auto=format&fit=crop&w=900&q=80",
-    "https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=900&q=80"
-  ]
-};
-
 const styles = StyleSheet.create({
   searchPanel: {
     backgroundColor: colors.surface,
@@ -736,6 +958,9 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 16,
     ...shadow
+  },
+  searchPanelDesktop: {
+    padding: 22
   },
   searchBox: {
     minHeight: 62,
@@ -786,6 +1011,61 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     overflow: "hidden"
   },
+  exploreDesktopLayout: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 28
+  },
+  exploreDesktopList: {
+    flex: 1,
+    minWidth: 0
+  },
+  exploreMapPanel: {
+    width: 390,
+    marginTop: 28,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "#F0D89A",
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+    gap: 14,
+    ...shadow
+  },
+  exploreMapHeader: { gap: 4 },
+  exploreMapEyebrow: { color: "#A87813", fontSize: 13, fontWeight: "900" },
+  exploreMapTitle: { color: colors.ink, fontSize: 24, fontWeight: "900" },
+  exploreMapCanvas: {
+    height: 260,
+    borderRadius: 22,
+    overflow: "hidden",
+    backgroundColor: "#FFF7DF",
+    borderWidth: 1,
+    borderColor: "#F0D89A"
+  },
+  exploreMapImage: { width: "100%", height: "100%" },
+  exploreMapEmpty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 20 },
+  exploreMapEmptyTitle: { color: colors.ink, fontSize: 18, fontWeight: "900" },
+  exploreMapEmptyCopy: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 6, textAlign: "center", fontWeight: "800" },
+  exploreMapCard: {
+    borderRadius: 20,
+    backgroundColor: "#FFF8E6",
+    borderWidth: 1,
+    borderColor: "#F0D89A",
+    padding: 14,
+    gap: 8
+  },
+  exploreMapCardName: { color: colors.ink, fontSize: 20, lineHeight: 25, fontWeight: "900" },
+  exploreMapCardMeta: { color: colors.muted, fontSize: 13, lineHeight: 19, fontWeight: "800" },
+  exploreMapCardActions: { flexDirection: "row", gap: 10, marginTop: 4 },
+  exploreMapPrimaryButton: { flex: 1, minHeight: 44, borderRadius: 999, backgroundColor: colors.cyan, alignItems: "center", justifyContent: "center" },
+  exploreMapPrimaryText: { color: "#271400", fontSize: 14, fontWeight: "900" },
+  exploreMapGhostButton: { minWidth: 86, minHeight: 44, borderRadius: 999, borderWidth: 1, borderColor: "#063F28", alignItems: "center", justifyContent: "center" },
+  exploreMapGhostText: { color: "#063F28", fontSize: 14, fontWeight: "900" },
+  exploreMapList: { gap: 8 },
+  exploreMapListItem: { borderRadius: 16, padding: 12, backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: "#EEF2F7" },
+  exploreMapListItemActive: { backgroundColor: "#FFF2CE", borderColor: colors.cyan },
+  exploreMapListName: { color: colors.ink, fontSize: 14, fontWeight: "900" },
+  exploreMapListMeta: { color: colors.muted, fontSize: 12, marginTop: 4, fontWeight: "800" },
   outlineButton: {
     borderWidth: 1,
     borderColor: "#1C5A3B",
@@ -812,6 +1092,16 @@ const styles = StyleSheet.create({
   heroCard: { width: 250 },
   heroImage: { width: "100%", height: 290, justifyContent: "space-between", padding: 12 },
   heroImageRadius: { borderRadius: 18 },
+  photoEmpty: {
+    backgroundColor: "#FFF8E6",
+    borderWidth: 1,
+    borderColor: "#F0D89A",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8
+  },
+  photoEmptyTitle: { color: colors.ink, fontSize: 18, fontWeight: "900" },
+  photoEmptyCopy: { color: colors.muted, fontSize: 13, lineHeight: 19, textAlign: "center", fontWeight: "800" },
   saveBubble: {
     alignSelf: "flex-end",
     width: 58,
@@ -858,6 +1148,8 @@ const styles = StyleSheet.create({
   popularList: { gap: 22, marginTop: 18 },
   popularRow: { flexDirection: "row", gap: 16, minHeight: 145, position: "relative" },
   popularImage: { width: 145, height: 145, borderRadius: 14, backgroundColor: "#F3F4F6" },
+  photoEmptySmall: { alignItems: "center", justifyContent: "center", padding: 10, borderWidth: 1, borderColor: "#F0D89A", backgroundColor: "#FFF8E6" },
+  photoEmptySmallText: { color: colors.muted, fontSize: 12, lineHeight: 16, textAlign: "center", fontWeight: "900" },
   popularBody: { flex: 1, paddingRight: 28 },
   guideBadgeSmall: { color: "#D43F53", fontSize: 13, fontWeight: "900", marginBottom: 4 },
   popularTitle: { color: colors.ink, fontSize: 23, lineHeight: 29, fontWeight: "900" },
@@ -885,24 +1177,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF"
   },
   allButtonText: { color: "#063F28", fontSize: 20, fontWeight: "900" },
-  insightHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  insightCount: { color: "#8A5B00", fontSize: 15, fontWeight: "900" },
-  insightCard: {
-    marginTop: 14,
-    borderRadius: 24,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#F0D89A",
-    padding: 18,
-    flexDirection: "row",
-    gap: 18
-  },
-  insightScore: { color: "#063F28", fontSize: 56, fontWeight: "900" },
-  insightBars: { flex: 1, gap: 10 },
-  insightBarRow: { gap: 5 },
-  insightBarLabel: { color: colors.ink, fontSize: 14, fontWeight: "900" },
-  insightTrack: { height: 10, borderRadius: 999, backgroundColor: "#E5E7EB", overflow: "hidden" },
-  insightFill: { height: "100%", borderRadius: 999, backgroundColor: "#009A44" },
   floatingMapButton: {
     position: "absolute",
     bottom: 88,
@@ -918,6 +1192,15 @@ const styles = StyleSheet.create({
   floatingMapText: { color: "#FFFFFF", fontSize: 22, fontWeight: "900" },
   detailPage: { flex: 1, backgroundColor: "#FFFFFF" },
   detailContent: { paddingBottom: 120 },
+  detailContentDesktop: {
+    maxWidth: 1120,
+    alignSelf: "center",
+    width: "100%",
+    borderRadius: 28,
+    overflow: "hidden",
+    marginTop: 10,
+    marginBottom: 40
+  },
   detailTopBar: {
     minHeight: 64,
     paddingHorizontal: 18,
@@ -964,6 +1247,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#E5E7EB"
   },
+  detailPhotoEmptyFrame: { alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: "#FFF8E6", borderWidth: 1, borderColor: "#F0D89A" },
   detailImage: { width: "100%", height: "100%", backgroundColor: "#F3F4F6" },
   awardPhotoBadge: {
     position: "absolute",
@@ -1000,6 +1284,34 @@ const styles = StyleSheet.create({
   detailMeta: { color: "#063F28", fontSize: 18, lineHeight: 28, marginTop: 10, fontWeight: "800" },
   detailLinkRow: { flexDirection: "row", gap: 24, marginTop: 16, flexWrap: "wrap" },
   detailLink: { color: "#063F28", fontSize: 18, fontWeight: "900", textDecorationLine: "underline" },
+  detailDesktopRail: {
+    marginTop: 20,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10
+  },
+  detailRailCard: {
+    minWidth: 160,
+    flexGrow: 1,
+    borderRadius: 18,
+    backgroundColor: "#FFF8E6",
+    borderWidth: 1,
+    borderColor: "#F0D89A",
+    padding: 14
+  },
+  detailRailLabel: { color: colors.muted, fontSize: 12, fontWeight: "900" },
+  detailRailValue: { color: colors.ink, fontSize: 15, lineHeight: 21, marginTop: 5, fontWeight: "900" },
+  detailRailPrimary: {
+    minHeight: 58,
+    minWidth: 230,
+    flexGrow: 1,
+    borderRadius: 18,
+    backgroundColor: "#063F28",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18
+  },
+  detailRailPrimaryText: { color: "#FFFFFF", fontSize: 15, fontWeight: "900" },
   detailSectionTitle: { color: "#063F28", fontSize: 26, fontWeight: "900", marginBottom: 14 },
   detailParagraph: { color: colors.ink, fontSize: 18, lineHeight: 29, fontWeight: "700", marginBottom: 10 },
   detailInfoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 12 },
@@ -1013,16 +1325,35 @@ const styles = StyleSheet.create({
   featureTitle: { color: "#063F28", fontSize: 19, fontWeight: "900" },
   featureCopy: { color: colors.ink, fontSize: 17, lineHeight: 26, marginTop: 4, fontWeight: "700" },
   reviewScoreCard: { flexDirection: "row", gap: 18 },
+  reviewScoreSummary: { minWidth: 106 },
   reviewBigScore: { color: "#063F28", fontSize: 56, fontWeight: "900" },
   reviewScoreLabel: { color: "#063F28", fontSize: 18, fontWeight: "900", marginBottom: 8 },
+  reviewScoreSub: { color: colors.muted, fontSize: 12, fontWeight: "900", marginTop: 8 },
   reviewBars: { flex: 1, gap: 12 },
   reviewBarRow: { gap: 6 },
+  reviewBarHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
   reviewBarLabel: { color: "#063F28", fontSize: 15, fontWeight: "900" },
+  reviewBarCount: { color: colors.ink, fontSize: 13, fontWeight: "900" },
   reviewTrack: { height: 10, backgroundColor: "#E5E7EB", borderRadius: 999, overflow: "hidden" },
   reviewFill: { height: "100%", backgroundColor: "#009A44" },
   commentHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   commentCount: { color: "#063F28", fontSize: 16, fontWeight: "900" },
-  commentBox: { flexDirection: "row", gap: 10, marginBottom: 18 },
+  commentBox: { gap: 10, marginBottom: 18 },
+  commentRatingPicker: {
+    borderRadius: 18,
+    backgroundColor: "#FFF7DF",
+    borderWidth: 1,
+    borderColor: "#F0D89A",
+    padding: 12,
+    gap: 8
+  },
+  commentRatingTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
+  commentRatingLabel: { color: "#063F28", fontSize: 14, fontWeight: "900" },
+  commentRatingHint: { color: "#A87813", fontSize: 13, fontWeight: "900" },
+  commentRatingDots: { flexDirection: "row", gap: 8 },
+  commentRatingDot: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: "#009A44", backgroundColor: "transparent" },
+  commentRatingDotActive: { backgroundColor: "#009A44" },
+  commentInputRow: { flexDirection: "row", gap: 10 },
   commentInput: { flex: 1, minHeight: 52, borderRadius: 18, backgroundColor: "#F9FAFB", paddingHorizontal: 14, color: colors.ink, fontSize: 16, fontWeight: "800" },
   commentSubmit: { minWidth: 72, borderRadius: 18, backgroundColor: colors.cyan, alignItems: "center", justifyContent: "center" },
   commentSubmitText: { color: "#271400", fontSize: 15, fontWeight: "900" },

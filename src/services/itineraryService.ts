@@ -671,7 +671,7 @@ function buildPersonalization(input: PlannerInput): Itinerary["personalization"]
     improvementTips: [
       "숙소를 Google Place로 선택하면 실제 이동시간 정확도가 더 좋아져요.",
       "마음에 안 드는 장소는 빼기/대체하기로 바로 수정하세요.",
-      "비가 오면 야외 사진명소보다 카페/마사지/실내 쇼핑을 앞으로 당기는 게 좋아요."
+      "비가 오면 야외 관광명소보다 카페/마사지/실내 쇼핑을 앞으로 당기는 게 좋아요."
     ]
   };
 }
@@ -679,7 +679,7 @@ function buildPersonalization(input: PlannerInput): Itinerary["personalization"]
 function getTravelerProfileCopy(input: PlannerInput) {
   if (input.preferences.includes("여자끼리")) return "여자끼리 여행 기준으로 후기 많은 곳과 안전한 밤 동선을 우선";
   if (input.companion === "혼자" || input.preferences.includes("혼자 여행")) return "혼자 여행 기준으로 밤 일정과 먼 이동을 줄임";
-  if (input.companion === "커플" || input.preferences.includes("커플 여행")) return "커플 여행 기준으로 감성 카페, 사진명소, 야경을 강화";
+  if (input.companion === "커플" || input.preferences.includes("커플 여행")) return "커플 여행 기준으로 감성 카페, 관광명소, 야경을 강화";
   if (input.companion === "가족" || input.preferences.includes("가족 여행")) return "가족 여행 기준으로 검증된 장소와 짧은 동선을 우선";
   if (input.preferences.includes("럭셔리") || input.budget === "프리미엄") return "럭셔리 취향 기준으로 스파, 루프탑, 쇼핑 비중 강화";
   return `${input.companion} 여행 기준으로 밤 일정과 이동 부담 조정`;
@@ -718,8 +718,8 @@ function buildDayPlan({
     totalCost: `${formatVndFromKrw(costMin)}~${formatVndFromKrw(costMax)}`,
     totalMoveTime: `${moveMinutes}분`,
     intensity,
-    rainyPlan: "비가 오면 야외 사진명소보다 카페, 마사지, 실내 쇼핑을 앞으로 당기세요.",
-    survivalTip: `${input.accommodationArea} 숙소 기준으로 출발 전 Google Maps와 Grab에 목적지를 모두 찍어두세요.`,
+    rainyPlan: "비가 오면 야외 관광명소보다 카페, 마사지, 실내 쇼핑을 앞으로 당기세요.",
+    survivalTip: `${input.accommodationArea} 숙소 기준으로 출발 전 지도 앱과 Grab에 목적지를 모두 찍어두세요.`,
     routeWarning,
     places
   };
@@ -1022,7 +1022,7 @@ function getDayTitle(destination: Destination, dayIndex: number) {
 function getMood(input: PlannerInput, dayIndex: number) {
   if (input.style === "빡세게") return "핵심 스팟과 투어를 촘촘히 넣은 고효율 동선";
   if (input.style === "여유롭게") return "이동을 줄이고 카페와 휴식을 넉넉히 둔 하루";
-  return dayIndex % 2 === 0 ? "사진명소와 쉬는 시간을 섞은 하루" : "맛집과 로컬 동선을 조금 더 넣은 하루";
+  return dayIndex % 2 === 0 ? "관광명소와 쉬는 시간을 섞은 하루" : "맛집과 로컬 동선을 조금 더 넣은 하루";
 }
 
 function getStyleStrategy(style: PlannerInput["style"]) {
