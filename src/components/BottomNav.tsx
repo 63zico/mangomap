@@ -49,49 +49,49 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 0,
-    alignItems: "center"
+    bottom: 10,
+    alignItems: "center",
+    paddingHorizontal: 14
   },
   wrap: {
     width: "100%",
     maxWidth: 560,
-    minHeight: 72,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    backgroundColor: "rgba(255,255,255,0.98)",
+    minHeight: 60,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.96)",
     borderWidth: 1,
-    borderColor: "rgba(183,121,0,0.12)",
+    borderColor: "rgba(24,32,42,0.08)",
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingHorizontal: 8,
-    paddingTop: 7,
-    paddingBottom: 9,
+    paddingHorizontal: 7,
+    paddingTop: 5,
+    paddingBottom: 5,
     ...shadow
   },
   item: {
     flex: 1,
-    maxWidth: 84,
+    maxWidth: 80,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 58,
-    borderRadius: 22,
+    minHeight: 50,
+    borderRadius: 15,
     position: "relative"
   },
   itemActive: {
-    backgroundColor: "rgba(255,212,59,0.28)",
+    backgroundColor: "rgba(255,179,33,0.16)",
     borderWidth: 1,
-    borderColor: "rgba(255,159,28,0.22)"
+    borderColor: "rgba(255,179,33,0.32)"
   },
   iconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center"
   },
   iconWrapActive: {
-    backgroundColor: colors.cyan
+    backgroundColor: "#FFFFFF"
   },
   icon: {
     color: colors.muted,
@@ -99,16 +99,16 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   activeIcon: {
-    color: colors.ink
+    color: colors.greenDeep
   },
   label: {
     color: colors.muted,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "900",
-    marginTop: 4
+    marginTop: 3
   },
   activeLabel: {
-    color: "#8A5A00"
+    color: colors.greenDeep
   },
   badge: {
     position: "absolute",
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#FF3B30",
     borderWidth: 2,
-    borderColor: "#FFF7DF"
+    borderColor: "#FFFFFF"
   },
   badgeText: {
     color: "#FFFFFF",

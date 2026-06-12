@@ -46,32 +46,32 @@ function Info({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "rgba(255,255,255,0.92)",
-    borderRadius: 24,
+    backgroundColor: colors.card,
+    borderRadius: 18,
     padding: 18,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "rgba(255,194,51,0.22)",
+    borderColor: colors.line,
     ...neonShadow
   },
   periodPill: {
     alignSelf: "flex-start",
-    borderRadius: 18,
+    borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: "rgba(255,194,51,0.16)",
+    backgroundColor: "rgba(15,81,50,0.08)",
     borderWidth: 1,
-    borderColor: "rgba(255,194,51,0.26)"
+    borderColor: "rgba(15,81,50,0.16)"
   },
   period: {
-    color: colors.cyan,
+    color: colors.greenDeep,
     fontSize: 13,
     fontWeight: "900"
   },
   name: {
     color: colors.nightText,
-    fontSize: 21,
-    fontWeight: "900",
+    fontSize: 20,
+    fontWeight: "800",
     marginTop: 12
   },
   description: {
@@ -87,11 +87,11 @@ const styles = StyleSheet.create({
   },
   info: {
     flex: 1,
-    backgroundColor: "#FFF7DF",
-    borderRadius: 16,
+    backgroundColor: "#F7F5EF",
+    borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)"
+    borderColor: colors.line
   },
   infoLabel: {
     color: colors.nightMuted,
@@ -105,15 +105,15 @@ const styles = StyleSheet.create({
     marginTop: 4
   },
   tipBox: {
-    backgroundColor: "rgba(255,122,0,0.13)",
+    backgroundColor: "rgba(15,81,50,0.07)",
     borderWidth: 1,
-    borderColor: "rgba(255,122,0,0.22)",
-    borderRadius: 16,
+    borderColor: "rgba(15,81,50,0.14)",
+    borderRadius: 14,
     padding: 12,
     marginTop: 12
   },
   tipLabel: {
-    color: colors.sunset,
+    color: colors.greenDeep,
     fontSize: 12,
     fontWeight: "900"
   },
@@ -125,11 +125,11 @@ const styles = StyleSheet.create({
   },
   mapButton: {
     minHeight: 46,
-    borderRadius: 23,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 14,
-    backgroundColor: colors.sunset,
+    backgroundColor: colors.greenDeep,
     ...sunsetGlow
   },
   mapText: {

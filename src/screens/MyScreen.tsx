@@ -5,11 +5,13 @@ import { Image, Platform, TextInput } from "react-native";
 
 import { AppShell } from "../components/AppShell";
 import { Header } from "../components/Header";
+import type { EngagementSummary } from "../services/mangomapEngagementService";
 import { confirmSupabasePhoneTrustOtp, isSupabaseAuthConfigured, sendSupabasePhoneOtp } from "../services/supabaseAuthService";
 import { colors, neonShadow, shadow, sunsetGlow } from "../styles/theme";
 import type { PlaceReport } from "../types";
 import type { AuthProvider, MemberProfile } from "../types/auth";
 import { getPlaceReportStatusLabel, getPlaceReportViewCount } from "../utils/placeReportRewards";
+import { deletePlaceReservationInquiry, loadPlaceReservationInquiries, type PlaceReservationInquiry } from "../utils/placeReservationInquiries";
 
 type MyScreenProps = {
   savedPlaceCount: number;
@@ -19,6 +21,7 @@ type MyScreenProps = {
   memberProvider?: AuthProvider;
   memberIdentity?: string;
   memberTemperature: number;
+  engagementSummary?: EngagementSummary;
   onOpenSaved: () => void;
   onOpenPlaces: () => void;
   onOpenReport: () => void;
@@ -90,7 +93,7 @@ const settingsDetailContent: Record<SettingsDetailKey, { title: string; subtitle
   },
   safety: {
     title: "장소 신뢰 가이드",
-    subtitle: "MANGOMAP은 한국인 여행자가 바로 판단할 수 있도록 검증 상태를 분리해서 보여줘요.",
+    subtitle: "망고베트남은 한국인 여행자가 바로 판단할 수 있도록 검증 상태를 분리해서 보여줘요.",
     rows: [
       { title: "확인됨", copy: "주소, 카테고리, Google Maps 연결을 확인한 장소예요." },
       { title: "제보됨", copy: "여행자가 올린 정보이며 운영자 검토 전까지 분리해서 표시해요." },
@@ -108,9 +111,9 @@ const settingsDetailContent: Record<SettingsDetailKey, { title: string; subtitle
   },
   notice: {
     title: "공지사항",
-    subtitle: "MANGOMAP 운영 공지와 업데이트 기록을 모아둘 공간이에요.",
+    subtitle: "망고베트남 운영 공지와 업데이트 기록을 모아둘 공간이에요.",
     rows: [
-      { title: "현재 버전", copy: "MANGOMAP 베트남 여행자 현지 장소 지도를 테스트 중이에요." },
+      { title: "현재 버전", copy: "망고베트남의 베트남 현지 장소 가이드를 테스트 중이에요." },
       { title: "최근 개선", copy: "장소 상세, 한국어 후기, 제보, 저장 흐름을 중심으로 정리했어요." },
       { title: "다음 예정", copy: "제보 승인 관리, 업체 혜택, 장소별 공유 화면을 정리할 예정이에요." }
     ]
@@ -126,7 +129,7 @@ const settingsDetailContent: Record<SettingsDetailKey, { title: string; subtitle
   },
   terms: {
     title: "이용약관",
-    subtitle: "MANGOMAP을 안전하게 쓰기 위한 기본 이용 규칙이에요.",
+    subtitle: "망고베트남을 안전하게 쓰기 위한 기본 이용 규칙이에요.",
     rows: [
       { title: "커뮤니티", copy: "허위 정보, 광고성 도배, 타인 비방, 개인정보 노출은 제한돼요." },
       { title: "장소 후기", copy: "방문하지 않은 장소를 확정적으로 단정하거나 악의적으로 비방하면 제한될 수 있어요." },
@@ -146,7 +149,7 @@ const settingsDetailContent: Record<SettingsDetailKey, { title: string; subtitle
     title: "버전정보",
     subtitle: "현재 앱 빌드와 연결 상태를 확인해요.",
     rows: [
-      { title: "앱 이름", copy: "MANGOMAP" },
+      { title: "앱 이름", copy: "망고베트남" },
       { title: "버전", copy: "1.0.0" },
       { title: "서버", copy: "Supabase 인증, 데이터베이스, 스토리지 연동 테스트 중" }
     ]
@@ -207,6 +210,7 @@ export function MyScreen({
   memberProvider,
   memberIdentity,
   memberTemperature,
+  engagementSummary,
   onOpenSaved,
   onOpenPlaces,
   onOpenReport,
@@ -230,7 +234,7 @@ export function MyScreen({
   const myTemperature = memberName ? `${memberTemperature.toFixed(1)}°C` : "-";
   const mangoTemperatureTitle = memberName ? `망고온도 ${myTemperature}` : "가입하면 망고온도가 생겨요";
   const mangoTemperatureCopy = memberName
-    ? "정확한 장소 제보와 한국어 후기가 쌓이면 올라가는 MANGOMAP의 대표 신뢰 지표예요."
+    ? "정확한 장소 제보와 한국어 후기가 쌓이면 올라가는 망고베트남의 대표 신뢰 지표예요."
     : "장소 제보와 한국어 후기 활동이 하나의 신뢰 온도로 쌓여요.";
   const authProviderLabel = getAuthProviderLabel(memberProvider);
   const authIdentity = getAuthIdentity(memberProvider, memberIdentity);
@@ -247,6 +251,25 @@ export function MyScreen({
   const [phoneStatus, setPhoneStatus] = useState("");
   const [phoneBusy, setPhoneBusy] = useState(false);
   const phoneVerified = Boolean(memberProfile?.phoneVerifiedAt);
+  const activitySummary = engagementSummary ?? {
+    savedCount: savedPlaceCount,
+    reviewCount: 0,
+    checkinCount: 0,
+    pointBalance: 0,
+    badgeLabel: "망고 새싹",
+    recentReviews: [],
+    recentCheckins: []
+  };
+  const [reservationInquiries, setReservationInquiries] = useState<PlaceReservationInquiry[]>(() => loadPlaceReservationInquiries());
+
+  const refreshReservationInquiries = () => {
+    setReservationInquiries(loadPlaceReservationInquiries());
+  };
+
+  const removeReservationInquiry = (id: string) => {
+    deletePlaceReservationInquiry(id);
+    refreshReservationInquiries();
+  };
 
   const openProfileEditor = () => {
     if (!memberName) {
@@ -405,7 +428,7 @@ export function MyScreen({
 
         <View style={styles.settingsGroup}>
           <Text style={styles.settingsGroupTitle}>앱 정보</Text>
-          <SettingsRow title="공지사항" value="MANGOMAP" onPress={() => setSettingsDetailKey("notice")} />
+          <SettingsRow title="공지사항" value="망고베트남" onPress={() => setSettingsDetailKey("notice")} />
           <SettingsRow title="고객센터" value="문의하기" onPress={() => setSettingsDetailKey("support")} />
           <SettingsRow title="이용약관" onPress={() => setSettingsDetailKey("terms")} />
           <SettingsRow title="개인정보 처리방침" onPress={() => setSettingsDetailKey("privacy")} />
@@ -656,10 +679,34 @@ export function MyScreen({
         </View>
       ) : null}
 
+      <View style={styles.rewardLoopCard}>
+        <View style={styles.rewardLoopHeader}>
+          <View>
+            <Text style={styles.rewardLoopEyebrow}>MANGO VIETNAM LOOP</Text>
+            <Text style={styles.rewardLoopTitle}>{memberName ? activitySummary.badgeLabel : "로그인하면 활동이 쌓여요"}</Text>
+            <Text style={styles.rewardLoopCopy}>저장, 후기, 체크인을 포인트 원장으로 기록해 재방문 이유를 만듭니다.</Text>
+          </View>
+          <View style={styles.rewardPointBadge}>
+            <Text style={styles.rewardPointValue}>{activitySummary.pointBalance.toLocaleString("ko-KR")}P</Text>
+            <Text style={styles.rewardPointLabel}>보유</Text>
+          </View>
+        </View>
+        <View style={styles.rewardMetricRow}>
+          <RewardMetric label="저장" value={`${activitySummary.savedCount}곳`} />
+          <RewardMetric label="후기" value={`${activitySummary.reviewCount}개`} />
+          <RewardMetric label="체크인" value={`${activitySummary.checkinCount}회`} />
+        </View>
+        <View style={styles.rewardRuleRow}>
+          <Text style={styles.rewardRule}>저장 +50P</Text>
+          <Text style={styles.rewardRule}>후기 +200P</Text>
+          <Text style={styles.rewardRule}>체크인 +500P</Text>
+        </View>
+      </View>
+
       <View style={styles.activityOverviewCard}>
         <View style={styles.activityOverviewTop}>
           <View style={styles.activityOverviewCopy}>
-            <Text style={styles.activityOverviewEyebrow}>내 망고맵</Text>
+            <Text style={styles.activityOverviewEyebrow}>내 망고베트남</Text>
             <Text style={styles.activityOverviewTitle}>{memberName ? explorerLevel.title : "저장과 제보를 한 곳에서 관리"}</Text>
             <Text style={styles.activityOverviewText}>
               {memberName
@@ -722,6 +769,49 @@ export function MyScreen({
         </View>
       </View>
 
+      <View style={styles.reservationInboxCard}>
+        <View style={styles.reservationInboxHeader}>
+          <View style={styles.reservationInboxCopy}>
+            <Text style={styles.reservationInboxEyebrow}>예약 문의 관리</Text>
+            <Text style={styles.reservationInboxTitle}>저장한 예약 문의 초안</Text>
+            <Text style={styles.reservationInboxText}>장소 상세에서 날짜와 인원을 남기면 여기에서 다시 확인할 수 있어요.</Text>
+          </View>
+          <View style={styles.reservationInboxBadge}>
+            <Text style={styles.reservationInboxBadgeValue}>{reservationInquiries.length}</Text>
+            <Text style={styles.reservationInboxBadgeLabel}>건</Text>
+          </View>
+        </View>
+        {reservationInquiries.length > 0 ? (
+          <View style={styles.reservationInquiryList}>
+            {reservationInquiries.slice(0, 4).map((inquiry) => (
+              <View key={inquiry.id} style={styles.reservationInquiryCard}>
+                <View style={styles.reservationInquiryTop}>
+                  <View style={styles.reservationInquiryTitleWrap}>
+                    <Text style={styles.reservationInquiryPlace} numberOfLines={1}>{inquiry.placeName}</Text>
+                    <Text style={styles.reservationInquiryMeta}>{inquiry.city} · {formatReservationInquiryDate(inquiry.createdAt)}</Text>
+                  </View>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`${inquiry.placeName} 예약 문의 초안 삭제`} onPress={() => removeReservationInquiry(inquiry.id)} style={styles.reservationInquiryDelete}>
+                    <Text style={styles.reservationInquiryDeleteText}>삭제</Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.reservationInquiryDraft} numberOfLines={2}>{inquiry.draft}</Text>
+                <Text style={styles.reservationInquiryStatus}>아직 전송 전 초안이에요. 제휴 예약 연결 시 바로 이어질 수 있어요.</Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.reservationInboxEmpty}>
+            <Text style={styles.reservationInboxEmptyTitle}>아직 문의 초안이 없어요</Text>
+            <Text style={styles.reservationInboxEmptyText}>검증 TOP 장소에서 예약 날짜, 인원, 요청사항을 먼저 남겨보세요.</Text>
+            <Pressable accessibilityRole="button" onPress={onOpenPlaces} style={styles.reservationInboxEmptyButton}>
+              <Text style={styles.reservationInboxEmptyButtonText}>검증 장소 보기</Text>
+            </Pressable>
+          </View>
+        )}
+      </View>
+
+      {false ? (
+        <>
       <View style={[styles.statsGrid, styles.hiddenBlock]}>
         <StatCard label="찜한 스팟" value={`${savedPlaceCount}곳`} />
         <StatCard label="스팟 제보" value={`${placeReports.length}건`} />
@@ -731,7 +821,7 @@ export function MyScreen({
       <View style={[styles.mangoLevelCard, styles.hiddenBlock]}>
         <View style={styles.mangoLevelTop}>
           <View>
-            <Text style={styles.mangoLevelEyebrow}>MANGOMAP 신뢰</Text>
+            <Text style={styles.mangoLevelEyebrow}>망고베트남 신뢰</Text>
             <Text style={styles.mangoLevelTitle}>{mangoTemperatureTitle}</Text>
           </View>
           <Text style={styles.mangoLevelBadge}>{memberName ? "대표 지표" : "시작"}</Text>
@@ -841,6 +931,8 @@ export function MyScreen({
         <InfoRow title="한국어 후기" copy="한국인 여행자가 가격, 분위기, 접근성을 남기면 신뢰도가 올라가요." />
         <InfoRow title="스팟 제보" copy="여행자가 직접 올린 장소는 검토중 상태로 분리해서 관리해요." />
       </View>
+        </>
+      ) : null}
     </AppShell>
   );
 }
@@ -901,6 +993,15 @@ function SettingsRow({ title, value, onPress }: { title: string; value?: string;
   );
 }
 
+function RewardMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.rewardMetric}>
+      <Text style={styles.rewardMetricLabel}>{label}</Text>
+      <Text style={styles.rewardMetricValue}>{value}</Text>
+    </View>
+  );
+}
+
 function InfoRow({ title, copy }: { title: string; copy: string }) {
   return (
     <View style={styles.infoRow}>
@@ -913,7 +1014,176 @@ function InfoRow({ title, copy }: { title: string; copy: string }) {
   );
 }
 
+function formatReservationInquiryDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "방금 저장";
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
 const styles = StyleSheet.create({
+  reservationInboxCard: {
+    marginTop: 16,
+    borderRadius: 24,
+    padding: 18,
+    backgroundColor: "rgba(255,255,255,0.98)",
+    borderWidth: 1,
+    borderColor: "rgba(255,194,51,0.30)",
+    ...shadow
+  },
+  reservationInboxHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 14
+  },
+  reservationInboxCopy: {
+    flex: 1
+  },
+  reservationInboxEyebrow: {
+    color: "#B77900",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900"
+  },
+  reservationInboxTitle: {
+    color: colors.ink,
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: "900",
+    marginTop: 3
+  },
+  reservationInboxText: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "800",
+    marginTop: 5
+  },
+  reservationInboxBadge: {
+    minWidth: 54,
+    minHeight: 54,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF2C2",
+    borderWidth: 1,
+    borderColor: "rgba(255,194,51,0.50)"
+  },
+  reservationInboxBadgeValue: {
+    color: "#271400",
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: "900"
+  },
+  reservationInboxBadgeLabel: {
+    color: "#8A5A00",
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "900"
+  },
+  reservationInquiryList: {
+    marginTop: 14,
+    gap: 10
+  },
+  reservationInquiryCard: {
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: "#FFF8E1",
+    borderWidth: 1,
+    borderColor: "#FFE3A3"
+  },
+  reservationInquiryTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  reservationInquiryTitleWrap: {
+    flex: 1
+  },
+  reservationInquiryPlace: {
+    color: colors.ink,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "900"
+  },
+  reservationInquiryMeta: {
+    color: "#8A5A00",
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "800",
+    marginTop: 2
+  },
+  reservationInquiryDelete: {
+    minHeight: 30,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.82)",
+    borderWidth: 1,
+    borderColor: "rgba(183,121,0,0.14)"
+  },
+  reservationInquiryDeleteText: {
+    color: "#7A4C00",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  reservationInquiryDraft: {
+    color: "#374151",
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "800",
+    marginTop: 10
+  },
+  reservationInquiryStatus: {
+    color: "#0B7A45",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "900",
+    marginTop: 8
+  },
+  reservationInboxEmpty: {
+    marginTop: 14,
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "rgba(17,24,39,0.06)"
+  },
+  reservationInboxEmptyTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "900"
+  },
+  reservationInboxEmptyText: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "800",
+    marginTop: 4
+  },
+  reservationInboxEmptyButton: {
+    alignSelf: "flex-start",
+    minHeight: 38,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFD43B",
+    marginTop: 12
+  },
+  reservationInboxEmptyButtonText: {
+    color: "#271400",
+    fontSize: 13,
+    fontWeight: "900"
+  },
   settingsHeader: {
     minHeight: 56,
     flexDirection: "row",
@@ -1576,6 +1846,100 @@ const styles = StyleSheet.create({
   },
   hiddenBlock: {
     display: "none"
+  },
+  rewardLoopCard: {
+    marginTop: 14,
+    borderRadius: 28,
+    backgroundColor: "#3B1D00",
+    borderWidth: 1,
+    borderColor: "rgba(255,194,51,0.40)",
+    padding: 18,
+    gap: 14,
+    ...shadow
+  },
+  rewardLoopHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12
+  },
+  rewardLoopEyebrow: {
+    color: "#FFD43B",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900"
+  },
+  rewardLoopTitle: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: "900",
+    marginTop: 4
+  },
+  rewardLoopCopy: {
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "800",
+    marginTop: 6
+  },
+  rewardPointBadge: {
+    minWidth: 76,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: "#FFD43B",
+    alignItems: "center"
+  },
+  rewardPointValue: {
+    color: "#2B1700",
+    fontSize: 15,
+    fontWeight: "900"
+  },
+  rewardPointLabel: {
+    color: "#6F4B00",
+    fontSize: 11,
+    fontWeight: "900",
+    marginTop: 2
+  },
+  rewardMetricRow: {
+    flexDirection: "row",
+    gap: 8
+  },
+  rewardMetric: {
+    flex: 1,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.13)",
+    paddingHorizontal: 12,
+    paddingVertical: 11
+  },
+  rewardMetricLabel: {
+    color: "#FFD43B",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  rewardMetricValue: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "900",
+    marginTop: 4
+  },
+  rewardRuleRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  rewardRule: {
+    color: "#2B1700",
+    backgroundColor: "#FFE89A",
+    overflow: "hidden",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 11,
+    fontWeight: "900"
   },
   activityOverviewCard: {
     marginTop: 16,

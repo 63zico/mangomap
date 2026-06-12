@@ -243,7 +243,7 @@ await writeFile(
       generatedAt: new Date().toISOString(),
       city: "multi-city",
       source: "Google Places API Text Search",
-      note: "MANGOMAP 도시별 기본 표본을 Google Places 기반으로 보강했습니다.",
+      note: "망고베트남 도시별 기본 표본을 Google Places 기반으로 보강했습니다.",
       total: nextGooglePlaces.length,
       places: nextGooglePlaces
     },

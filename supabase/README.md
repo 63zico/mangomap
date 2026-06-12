@@ -16,6 +16,18 @@ Run these SQL files in the Supabase SQL Editor in this order.
      - `mangomap-market-images`
      - `mangomap-meetup-images`
 
+4. `restaurants-collector.sql`
+   - Optional but recommended before using `/admin/place-collector`.
+   - Adds collector-compatible restaurant columns when missing.
+   - Adds unique indexes for `slug` and `google_maps_url` to prevent duplicate Google Places imports.
+
+5. `seo-growth-schema.sql`
+   - Adds scalable SEO growth tables without rebuilding the existing `restaurants` table.
+   - Creates `seo_landing_pages`, `landmarks`, `authors`, internal link, related restaurant, and schema cache tables.
+   - Seeds core Vietnam landmarks for Ho Chi Minh City, Da Nang, Nha Trang, Hanoi, Da Lat, and Phu Quoc.
+   - Adds generated `location` columns for landmark/restaurant distance checks.
+   - Required before calling `/api/admin/seo-automation/generate`.
+
 After running all three, use this quick check:
 
 ```sql
@@ -34,7 +46,13 @@ where table_schema = 'public'
     'trade_reviews',
     'content_reports',
     'user_blocks',
-    'account_deletion_requests'
+    'account_deletion_requests',
+    'seo_landing_pages',
+    'landmarks',
+    'authors',
+    'seo_internal_links',
+    'restaurant_related',
+    'restaurant_schema_cache'
   )
 order by table_name;
 

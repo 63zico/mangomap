@@ -1,6 +1,6 @@
 ﻿{
   "expo": {
-    "name": "MANGOMAP",
+    "name": "망고베트남",
     "slug": "mangomap",
     "version": "1.0.0",
     "scheme": "mangomap",
@@ -18,8 +18,8 @@
       "bundleIdentifier": "app.mangomap.travel",
       "buildNumber": "1",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "MANGOMAP에서 모임과 중고장터 사진을 등록하기 위해 사진 접근 권한이 필요합니다.",
-        "NSCameraUsageDescription": "MANGOMAP에서 모임과 중고장터 사진을 촬영해 등록하기 위해 카메라 권한이 필요합니다."
+        "NSPhotoLibraryUsageDescription": "망고베트남에서 모임과 중고장터 사진을 등록하기 위해 사진 접근 권한이 필요합니다.",
+        "NSCameraUsageDescription": "망고베트남에서 모임과 중고장터 사진을 촬영해 등록하기 위해 카메라 권한이 필요합니다."
       }
     },
     "android": {

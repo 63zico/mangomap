@@ -8,8 +8,8 @@ const doyaDistrict1Benefit: NonNullable<CuratedPlace["partnerBenefit"]> = {
   id: "benefit-doya-jjambbong-district-1-5-percent",
   status: "active",
   partnerName: "도야짬뽕 1군점",
-  title: "망고맵 보고 방문하면 5% 할인",
-  summary: "도야짬뽕 1군점에서 주문 전에 이 화면을 보여주고 '망고맵 보고 왔어요'라고 말하면 5% 할인 혜택을 받을 수 있어요.",
+  title: "망고베트남 보고 방문하면 5% 할인",
+  summary: "도야짬뽕 1군점에서 주문 전에 이 화면을 보여주고 '망고베트남 보고 왔어요'라고 말하면 5% 할인 혜택을 받을 수 있어요.",
   usageGuide: "주문 전에 직원에게 이 혜택 화면을 보여주세요.",
   terms: [
     "도야짬뽕 1군점 방문 주문 기준",
@@ -25,7 +25,7 @@ const withPartnerBenefits = (place: CuratedPlace): CuratedPlace => {
     return place;
   }
 
-  const benefitTags = ["망고맵제휴", "5%할인"];
+  const benefitTags = ["망고베트남제휴", "5%할인"];
   return {
     ...place,
     tags: Array.from(new Set([...place.tags, ...benefitTags])),

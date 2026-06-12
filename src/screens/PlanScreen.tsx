@@ -244,7 +244,7 @@ function JourneyPreview({
   return (
     <View style={styles.journeyCard}>
       <Text style={styles.journeyStep}>3. AI 일정 생성</Text>
-      <Text style={styles.journeyTitle}>MANGOMAP이{"\n"}당신만의 일정을 만들었어요!</Text>
+      <Text style={styles.journeyTitle}>망고베트남이{"\n"}당신만의 일정을 만들었어요!</Text>
 
       <View style={styles.journeyTabs}>
         {itinerary.days.map((item) => (

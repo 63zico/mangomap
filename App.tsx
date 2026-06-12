@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Platform, View } from "react-native";
+import { Platform, useWindowDimensions, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 
@@ -21,6 +21,15 @@ import { createInitialGooglePlacesState } from "./src/services/googlePlacesServi
 import { convertCuratedPlaceToPlanPlace, getReplacementCandidates } from "./src/services/placeReplacementService";
 import { curatedPlaces } from "./src/data/places";
 import { loadSavedPlaceIds, savePlaceIds } from "./src/storage/savedPlaces";
+import {
+  awardPointsOnce,
+  deleteRemoteSavedPlace,
+  emptyEngagementSummary,
+  loadEngagementSummary,
+  loadRemoteSavedPlaceIds,
+  type EngagementSummary,
+  upsertRemoteSavedPlace
+} from "./src/services/mangomapEngagementService";
 import { loadSavedTrips, saveTrip } from "./src/storage/savedTrips";
 import { deletePlaceReport, loadPlaceReports, savePlaceReport } from "./src/storage/placeReports";
 import { requestMemberAccountDeletion, syncMemberProfileToSupabase } from "./src/storage/memberProfiles";
@@ -146,8 +155,10 @@ function saveMemberTemperature(value: number) {
 }
 
 export default function App() {
-  const [screen, setScreen] = useState<ScreenName>("places");
-  const [showWelcomePopup, setShowWelcomePopup] = useState(() => !loadWelcomeSeen());
+  const { width } = useWindowDimensions();
+  const [screen, setScreen] = useState<ScreenName>("home");
+  const [placesDetailOpen, setPlacesDetailOpen] = useState(false);
+  const [showWelcomePopup, setShowWelcomePopup] = useState(false);
   const [plannerInput, setPlannerInput] = useState<PlannerInput>(initialInput);
   const [currentItinerary, setCurrentItinerary] = useState<Itinerary>(() => generateItinerary(initialInput));
   const [savedTrips, setSavedTrips] = useState<SavedTrip[]>([]);
@@ -169,6 +180,7 @@ export default function App() {
   const [travelEntryMode, setTravelEntryMode] = useState<TravelEntryMode>("all");
   const [marketplaceEntryMode, setMarketplaceEntryMode] = useState<MarketplaceEntryMode>("all");
   const [tabBadges, setTabBadges] = useState<Partial<Record<ScreenName, number>>>({});
+  const [engagementSummary, setEngagementSummary] = useState<EngagementSummary>(emptyEngagementSummary);
   const myPlaceReports = useMemo(() => {
     const reporterIds = [memberProfile?.authUid, memberProfile?.id].filter(Boolean);
     if (reporterIds.length === 0) return placeReports;
@@ -186,10 +198,39 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
+    const memberId = memberProfile?.authUid ?? memberProfile?.id;
+    if (!memberId) {
+      setEngagementSummary(emptyEngagementSummary);
+      return () => {
+        active = false;
+      };
+    }
+
+    Promise.all([loadRemoteSavedPlaceIds(memberId), loadEngagementSummary(memberId)])
+      .then(([remoteSavedIds, summary]) => {
+        if (!active) return;
+        const mergedSavedIds = Array.from(new Set([...remoteSavedIds, ...savedPlaceIds]));
+        if (mergedSavedIds.length !== savedPlaceIds.length) {
+          setSavedPlaceIds(mergedSavedIds);
+          savePlaceIds(mergedSavedIds).catch(() => undefined);
+        }
+        setEngagementSummary(summary);
+      })
+      .catch(() => {
+        if (active) setEngagementSummary(emptyEngagementSummary);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [memberProfile?.authUid, memberProfile?.id]);
+
+  useEffect(() => {
+    let active = true;
     setLiveInfo(createFallbackLiveInfo(plannerInput.destination));
     setGooglePlaces({
       ...createInitialGooglePlacesState(plannerInput.destination),
-      message: "저장된 MANGOMAP 장소 DB를 우선 사용해요."
+      message: "저장된 망고베트남 장소 DB를 우선 사용해요."
     });
 
     loadLiveTravelInfo(plannerInput.destination)
@@ -205,7 +246,11 @@ export default function App() {
     };
   }, [plannerInput.destination]);
 
-  const showBottomNav = useMemo(() => tabScreens.includes(screen), [screen]);
+  useEffect(() => {
+    if (screen !== "places") setPlacesDetailOpen(false);
+  }, [screen]);
+
+  const showBottomNav = useMemo(() => width < 900 && tabScreens.includes(screen) && !(screen === "places" && placesDetailOpen), [placesDetailOpen, screen, width]);
 
   const openPlanner = (destination?: Destination) => {
     setPrefillDestination(destination);
@@ -215,6 +260,7 @@ export default function App() {
   const openPlaces = (filterId?: string, destination?: Destination) => {
     setExploreFilterId(filterId);
     setExploreDestination(destination);
+    setPlacesDetailOpen(false);
     setScreen("places");
   };
 
@@ -231,6 +277,7 @@ export default function App() {
   const openPlaceReport = () => {
     setExploreFilterId(undefined);
     setExploreDestination(undefined);
+    setPlacesDetailOpen(false);
     setPlaceReportOpenRequest((current) => current + 1);
     setScreen("places");
   };
@@ -261,7 +308,7 @@ export default function App() {
 
   const openWelcomeMap = () => {
     closeWelcomePopup();
-    setScreen("places");
+    setScreen("home");
   };
 
   const openWelcomePopularPlaces = () => {
@@ -272,7 +319,7 @@ export default function App() {
   const openWelcomeJoin = () => {
     closeWelcomePopup();
     setAuthPrompt({
-      title: "MANGOMAP 시작하기",
+      title: "망고베트남 시작하기",
       copy: "지도와 장소 탐색은 바로 볼 수 있고, 저장·한국어 후기·장소 제보는 카카오 또는 Google 로그인 후 사용할 수 있어요."
     });
   };
@@ -414,9 +461,24 @@ export default function App() {
   };
 
   const toggleSavedPlace = async (placeId: string) => {
-    const nextIds = savedPlaceIds.includes(placeId) ? savedPlaceIds.filter((id) => id !== placeId) : [placeId, ...savedPlaceIds];
+    const saving = !savedPlaceIds.includes(placeId);
+    const nextIds = saving ? [placeId, ...savedPlaceIds] : savedPlaceIds.filter((id) => id !== placeId);
     setSavedPlaceIds(nextIds);
     await savePlaceIds(nextIds);
+    const memberId = memberProfile?.authUid ?? memberProfile?.id;
+    const place = curatedPlaces.find((candidate) => candidate.id === placeId);
+    if (!memberId || !place) return;
+    try {
+      if (saving) {
+        await upsertRemoteSavedPlace(place, memberId);
+        await awardPointsOnce("saved_place", placeId, 50, "장소 저장");
+      } else {
+        await deleteRemoteSavedPlace(placeId, memberId);
+      }
+      setEngagementSummary(await loadEngagementSummary(memberId));
+    } catch {
+      // Local save remains available even if realtime sync is temporarily unavailable.
+    }
   };
 
   const submitPlaceReport = async (report: PlaceReport) => {
@@ -515,11 +577,14 @@ export default function App() {
             onOpenTravel={() => openTravel()}
             onOpenMarketplace={() => openMarketplace()}
             onOpenReport={openPlaceReport}
+            onOpenSavedPlaces={() => setScreen("saved")}
+            savedPlaceIds={savedPlaceIds}
+            onToggleSavedPlace={toggleSavedPlace}
             onSubmitPlaceReport={submitPlaceReport}
             memberId={memberProfile?.authUid ?? memberProfile?.id}
             onRequireAuth={() =>
               setAuthPrompt({
-                title: "MANGOMAP 제보 참여",
+                title: "망고베트남 제보 참여",
                 copy: "장소 제보와 정보 수정 요청은 검토 상태를 남겨야 해서 카카오 또는 Google 로그인 후 사용할 수 있어요."
               })
             }
@@ -564,6 +629,7 @@ export default function App() {
             memberId={memberProfile?.authUid ?? memberProfile?.id}
             memberName={memberProfile?.nickname}
             onMangoTemperatureChange={updateMemberTemperature}
+            onDetailOpenChange={setPlacesDetailOpen}
             onRequireAuth={() =>
               setAuthPrompt({
                 title: "망고단 참여는 가입 후 가능해요",
@@ -626,6 +692,7 @@ export default function App() {
             memberProvider={memberProfile?.provider}
             memberIdentity={memberProfile?.phone ?? memberProfile?.email}
             memberTemperature={memberTemperature}
+            engagementSummary={engagementSummary}
             onOpenSaved={() => setScreen("saved")}
             onOpenPlaces={() => openPlaces()}
             onOpenReport={openPlaceReport}
@@ -633,7 +700,7 @@ export default function App() {
             onOpenMarketplace={() => openMarketplace("trading")}
             onRequireAuth={() =>
               setAuthPrompt({
-                title: "MANGOMAP 가입하기",
+                title: "망고베트남 가입하기",
                 copy: "지도와 장소 탐색은 바로 볼 수 있고, 프로필·저장·한국어 후기·장소 제보는 인증 후 사용할 수 있어요."
               })
             }

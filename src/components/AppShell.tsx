@@ -29,7 +29,6 @@ export function AppShell({
     <SafeAreaView style={[styles.safeArea, backgroundColor ? { backgroundColor } : null]}>
       <View pointerEvents="none" style={styles.mangoWash} />
       <View pointerEvents="none" style={styles.softDivider} />
-      <View pointerEvents="none" style={styles.mangoGlow} />
       {scroll ? (
         <ScrollView contentContainerStyle={[styles.scrollContent, withBottomNav && styles.navPadding]} showsVerticalScrollIndicator={false}>
           {content}
@@ -44,7 +43,8 @@ export function AppShell({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.midnight
+    backgroundColor: colors.cream,
+    overflow: "hidden"
   },
   mangoWash: {
     ...StyleSheet.absoluteFillObject,
@@ -56,20 +56,7 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     height: 1,
-    backgroundColor: "rgba(183,121,0,0.10)"
-  },
-  mangoGlow: {
-    position: "absolute",
-    right: -96,
-    top: -92,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: "rgba(255,212,59,0.34)",
-    shadowColor: colors.cyan,
-    shadowOpacity: 0.22,
-    shadowRadius: 38,
-    shadowOffset: { width: 0, height: 0 }
+    backgroundColor: "rgba(24,32,42,0.08)"
   },
   scrollContent: {
     flexGrow: 1,
@@ -87,9 +74,9 @@ const styles = StyleSheet.create({
     maxWidth: 560,
     alignSelf: "center",
     paddingHorizontal: 20,
-    paddingVertical: 18
+    paddingVertical: 16
   },
   navPadding: {
-    paddingBottom: 156
+    paddingBottom: 112
   }
 });

@@ -31,7 +31,7 @@ export function isSupabaseAuthConfigured() {
 
 function buildPhoneNickname(phoneNumber: string) {
   const digits = phoneNumber.replace(/\D/g, "");
-  return digits.length >= 4 ? `여행자${digits.slice(-4)}` : "MANGOMAP 여행자";
+  return digits.length >= 4 ? `여행자${digits.slice(-4)}` : "망고베트남 여행자";
 }
 
 function buildPayload(provider: AuthJoinPayload["provider"], user: SupabaseUser, fallbackNickname: string): AuthJoinPayload {

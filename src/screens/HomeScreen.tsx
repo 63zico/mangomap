@@ -1,14 +1,17 @@
-import { createElement, useEffect, useMemo, useState } from "react";
-import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
+import { Image, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { BrandLogo } from "../components/BrandLogo";
 import { curatedPlaces } from "../data/places";
 import { isSupabaseConfigured, supabaseSelect } from "../services/supabaseClient";
 import { colors, neonShadow, shadow, sunsetGlow } from "../styles/theme";
-import type { CuratedPlace, CuratedPlaceCategory, Destination, GooglePlacesState, Itinerary, LiveTravelInfo, PlaceReport, PlannerInput } from "../types";
+import type { CuratedPlace, Destination, GooglePlacesState, Itinerary, LiveTravelInfo, PlaceReport, PlannerInput } from "../types";
 import { trackEvent } from "../utils/analytics";
 import { getMangoCommentCount, getMangoRecommendationCount } from "../utils/placeCommunity";
+import { compareMangoSafeChoices, getMangoSafeChoiceProfile } from "../utils/mangoSafeChoice";
+import { getMangoRankScore, isMangoRecentlyRisingPlace } from "../utils/placeRanking";
+import { getRealisticPlaceReviews, getStrictPlaceCategory, matchesStrictCategory } from "../utils/placeTrust";
 
 type HomeScreenProps = {
   input: PlannerInput;
@@ -24,6 +27,9 @@ type HomeScreenProps = {
   onOpenTravel: () => void;
   onOpenMarketplace: () => void;
   onOpenReport: () => void;
+  onOpenSavedPlaces?: () => void;
+  savedPlaceIds?: string[];
+  onToggleSavedPlace?: (placeId: string) => void;
   onSubmitPlaceReport: (report: PlaceReport) => void | Promise<void>;
   memberId?: string;
   onRequireAuth?: () => void;
@@ -170,23 +176,52 @@ const mapDestinations = ["호치민", "다낭", "나트랑", "하노이", "달�
 type MapDestination = (typeof mapDestinations)[number];
 
 const mapCategories: MapCategory[] = [
-  { id: "food", filterId: "food", label: "맛집", dot: "#FF7A00", icon: "M", copy: "한국인 후기 많은 식당" },
-  { id: "cafe", filterId: "cafe", label: "카페", dot: "#FFC233", icon: "C", copy: "쉬기 좋고 사진 남기기 좋은 카페" },
-  { id: "massage", filterId: "massage", label: "마사지", dot: "#3E8DFF", icon: "S", copy: "걷는 일정 중간 회복 코스" },
-  { id: "market", filterId: "shopping", label: "쇼핑", dot: "#FFB84D", icon: "B", copy: "시장·기념품·여행템" },
-  { id: "exchange", filterId: "exchange", label: "생활", dot: "#FDE047", icon: "V", copy: "환전·실용 장소" },
-  { id: "photo", filterId: "photo", label: "여행", dot: "#20D8D2", icon: "P", copy: "관광명소·밤코스·투어" }
+  { id: "food", filterId: "food", label: "전체 맛집", dot: "#FF7A00", icon: "🍜", copy: "한국인 후기와 최근 확인 기준으로 고른 식당" },
+  { id: "vietnamese", filterId: "vietnamese", label: "로컬 맛집", dot: "#F97316", icon: "VN", copy: "쌀국수·분짜·반미처럼 실패 적은 로컬 식당" },
+  { id: "korean", filterId: "korean", label: "한식", dot: "#16A34A", icon: "한", copy: "한국 음식이 생각날 때 무난한 식당" },
+  { id: "chinese", filterId: "chinese", label: "중식", dot: "#EF4444", icon: "中", copy: "짬뽕·딤섬처럼 익숙한 메뉴" },
+  { id: "japanese", filterId: "japanese", label: "일식", dot: "#111827", icon: "日", copy: "스시·라멘·이자카야 추천" },
+  { id: "cafe", filterId: "cafe", label: "카페", dot: "#FFC233", icon: "☕", copy: "식사 전후 쉬어가기 좋은 카페" }
 ];
+
+const safeSituationFilters = ["부모님", "혼밥", "로컬", "쌀국수", "해장", "분위기", "예약 쉬움", "바가지 낮음"];
+
+const guideSituationFilters = [
+  "첫날 저녁",
+  "부모님",
+  "혼밥",
+  "로컬 입문",
+  "접대",
+  "해장",
+  "야식",
+  "비 오는 날",
+  "가성비",
+  "분위기",
+  "한식 충전",
+  "예약 쉬움"
+];
+
+type HomeGuideCard = {
+  id: string;
+  situation: string;
+  title: string;
+  target: string;
+  copy: string;
+  placeNames: string[];
+  updatedLabel: string;
+  filterId: string;
+};
 
 const cityCounts: Record<string, number> = {
   food: 28,
+  vietnamese: 16,
   cafe: 14,
   rooftop: 24,
-  market: 11,
-  photo: 18,
-  exchange: 8,
+  korean: 10,
+  chinese: 8,
+  japanese: 8,
+  tour: 18,
   massage: 10,
-  karaoke: 4
 };
 
 const mapSpots = [
@@ -210,6 +245,9 @@ export function HomeScreen({
   onOpenTravel,
   onOpenMarketplace,
   onOpenReport,
+  onOpenSavedPlaces,
+  savedPlaceIds = [],
+  onToggleSavedPlace,
   onSubmitPlaceReport,
   memberId,
   onRequireAuth
@@ -221,9 +259,29 @@ export function HomeScreen({
   const [qualityRequestForm, setQualityRequestForm] = useState<QualityRequestForm>(createQualityRequestForm);
   const [qualityRequestStatus, setQualityRequestStatus] = useState("");
   const [qualityRequestSubmitting, setQualityRequestSubmitting] = useState(false);
-  const { width } = useWindowDimensions();
+  const [sheetSnap, setSheetSnap] = useState<"peek" | "mid" | "full">("peek");
+  const { width, height } = useWindowDimensions();
   const isDesktop = width >= 1024;
+  const isCompactMobile = !isDesktop && height < 760;
+  const navOffset = isCompactMobile ? 82 : 94;
+  const locateButtonSize = isCompactMobile ? 52 : 60;
+  const sheetTargetHeight =
+    sheetSnap === "peek"
+      ? Math.max(isCompactMobile ? 292 : 320, height * (isCompactMobile ? 0.42 : 0.38))
+      : sheetSnap === "mid"
+        ? height * 0.5
+        : height * (isCompactMobile ? 0.74 : 0.78);
+  const sheetHeight = Math.round(
+    Math.min(
+      isDesktop ? 620 : Math.max(160, height - navOffset - (isCompactMobile ? 76 : 104)),
+      sheetTargetHeight
+    )
+  );
+  const sheetTop = height - navOffset - sheetHeight;
+  const locateTop = Math.max(isCompactMobile ? 212 : 274, sheetTop - locateButtonSize - 14);
+  const locateBottom = Math.max(navOffset + 12, height - locateTop - locateButtonSize);
   const selectedCategory = mapCategories.find((category) => category.id === selectedCategoryId) ?? mapCategories[0];
+  const selectedCategoryDisplayLabel = selectedCategory.id === "food" ? "맛집" : selectedCategory.label;
   const visibleFocusedPlace =
     focusedPlace &&
     focusedPlace.city === selectedMapDestination &&
@@ -240,6 +298,8 @@ export function HomeScreen({
     () => countHomeMappableCategoryPlaces(selectedMapDestination, selectedCategory),
     [selectedMapDestination, selectedCategory]
   );
+  const visibleMapMarkerCount = Math.min(selectedMapMarkerCount, 8);
+  const verifiedHomeTopCount = Math.min(8, selectedCategoryCount);
   const topSavedPlaces = useMemo(() => {
     return dedupeHomePlaces(
       curatedPlaces.filter((place) => place.city === selectedMapDestination && !isHomeSuppressedPlace(place))
@@ -248,6 +308,39 @@ export function HomeScreen({
       .slice(0, 5);
   }, [selectedMapDestination]);
   const recentKoreanReviews = useMemo(() => buildRecentKoreanReviews(topSavedPlaces), [topSavedPlaces]);
+  const selectedMapPlaces = useMemo(
+    () => getHomeSafeMapPlaces(selectedMapDestination, selectedCategory.id).slice(0, sheetSnap === "full" ? 12 : sheetSnap === "mid" ? 2 : 1),
+    [selectedMapDestination, selectedCategory.id, sheetSnap]
+  );
+  const guideTopPlaces = useMemo(
+    () => getHomeSafeMapPlaces(selectedMapDestination, "food").slice(0, 8),
+    [selectedMapDestination]
+  );
+  const homeGuideCards = useMemo(
+    () => buildHomeSituationGuides(selectedMapDestination, guideTopPlaces),
+    [guideTopPlaces, selectedMapDestination]
+  );
+
+  const expandSheet = () => {
+    setSheetSnap((current) => (current === "peek" ? "mid" : "full"));
+  };
+
+  const collapseSheet = () => {
+    setSheetSnap((current) => (current === "full" ? "mid" : "peek"));
+  };
+
+  const sheetPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 8,
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dy < -36) {
+          expandSheet();
+          return;
+        }
+        if (gesture.dy > 36) collapseSheet();
+      }
+    })
+  ).current;
 
   useEffect(() => {
     setSelectedMapDestination(input.destination);
@@ -379,10 +472,604 @@ export function HomeScreen({
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        style={styles.guideHomeScroll}
+        contentContainerStyle={[styles.guideHomeContent, isDesktop && styles.guideHomeContentDesktop]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.guideHero, isDesktop && styles.guideHeroDesktop]}>
+          <View style={styles.guideHeroTop}>
+            <View style={styles.guideBrandMark}>
+              <BrandLogo size={74} />
+            </View>
+            <View style={styles.guideHeroTrustBadge}>
+              <Text style={styles.guideHeroTrustText}>한국인 기준</Text>
+            </View>
+          </View>
+          <Text style={styles.guideEyebrow}>MANGO VIETNAM GUIDE</Text>
+          <Text style={[styles.guideHeroTitle, isDesktop && styles.guideHeroTitleDesktop]}>한국인이 베트남에서 식당 고르다 실패하지 않게</Text>
+          <Text style={styles.guideHeroCopy}>
+            모든 식당을 보여주지 않아요. 한국인 후기, 최근 확인, 가격 리스크를 기준으로 먼저 볼 선택지만 골라요.
+          </Text>
+          <View style={styles.guideHeroActions}>
+            <Pressable accessibilityRole="button" onPress={openPopularPlaces} style={styles.guidePrimaryButton}>
+              <Text style={styles.guidePrimaryButtonText}>오늘의 검증 TOP 보기</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={openReportFromHome} style={styles.guideGhostButton}>
+              <Text style={styles.guideGhostButtonText}>장소 제보</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {isDesktop ? (
+          <View style={styles.guideDesktopGrid}>
+            <View style={styles.guideDesktopLeft}>
+              <View style={[styles.guidePanel, styles.guideDesktopPanel]}>
+                <View style={styles.guideSectionHeader}>
+                  <View>
+                    <Text style={styles.guideSectionKicker}>상황 탐색</Text>
+                    <Text style={styles.guideSectionTitle}>음식보다 상황이 먼저예요</Text>
+                  </View>
+                </View>
+                <View style={styles.guideDesktopSituationList}>
+                  {guideSituationFilters.slice(0, 10).map((filter, index) => (
+                    <Pressable
+                      key={filter}
+                      accessibilityRole="button"
+                      onPress={() => onOpenPlaces("all", selectedMapDestination)}
+                      style={[styles.guideDesktopSituationItem, index === 0 && styles.guideDesktopSituationItemActive]}
+                    >
+                      <Text style={[styles.guideDesktopSituationText, index === 0 && styles.guideDesktopSituationTextActive]}>{filter}</Text>
+                      <Text style={styles.guideDesktopSituationArrow}>›</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              <View style={[styles.guidePanel, styles.guideDesktopPanel]}>
+                <View style={styles.guideSectionHeader}>
+                  <View>
+                    <Text style={styles.guideSectionKicker}>도시 변경</Text>
+                    <Text style={styles.guideSectionTitle}>베트남 주요 도시</Text>
+                  </View>
+                </View>
+                <View style={styles.guideDesktopCityGrid}>
+                  {mapDestinations.map((destination) => {
+                    const selected = selectedMapDestination === destination;
+                    return (
+                      <Pressable
+                        key={destination}
+                        accessibilityRole="button"
+                        onPress={() => setSelectedMapDestination(destination)}
+                        style={[styles.guideDesktopCityButton, selected && styles.guideDesktopCityButtonActive]}
+                      >
+                        <Text style={[styles.guideDesktopCityText, selected && styles.guideDesktopCityTextActive]}>{destination}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.guideDesktopCenter}>
+              <View style={[styles.guidePanel, styles.guideDesktopPanel]}>
+                <View style={styles.guideSectionHeader}>
+                  <View>
+                    <Text style={styles.guideSectionKicker}>추천 가이드</Text>
+                    <Text style={styles.guideSectionTitle}>{selectedMapDestination}에서 바로 쓰는 판단 리스트</Text>
+                  </View>
+                </View>
+                <View style={[styles.guideCardList, styles.guideDesktopCardGrid]}>
+                  {homeGuideCards.map((guide) => (
+                    <Pressable
+                      key={guide.id}
+                      accessibilityRole="button"
+                      onPress={() => onOpenPlaces(guide.filterId, selectedMapDestination)}
+                      style={[styles.guideContentCard, styles.guideDesktopContentCard]}
+                    >
+                      <View style={styles.guideContentTop}>
+                        <Text style={styles.guideContentSituation}>{guide.situation}</Text>
+                        <Text style={styles.guideContentUpdated}>{guide.updatedLabel}</Text>
+                      </View>
+                      <Text style={styles.guideContentTitle}>{guide.title}</Text>
+                      <Text style={styles.guideContentCopy}>{guide.copy}</Text>
+                      <View style={styles.guideContentFooter}>
+                        <Text style={styles.guideContentTarget}>{guide.target}</Text>
+                        <Text style={styles.guideContentPlaces} numberOfLines={1}>{guide.placeNames.join(" · ")}</Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              <View style={[styles.guidePanel, styles.guideDesktopPanel]}>
+                <View style={styles.guideSectionHeader}>
+                  <View>
+                    <Text style={styles.guideSectionKicker}>오늘의 검증 TOP</Text>
+                    <Text style={styles.guideSectionTitle}>먼저 이 8곳만 봐도 충분해요</Text>
+                  </View>
+                  <Pressable accessibilityRole="button" onPress={openPopularPlaces} style={styles.guideSmallButton}>
+                    <Text style={styles.guideSmallButtonText}>전체 보기</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.guideTopList}>
+                  {guideTopPlaces.slice(0, 5).map((place, index) => {
+                    const safeProfile = getMangoSafeChoiceProfile(place, { surface: "home", categoryId: "food" });
+                    const saved = savedPlaceIds.includes(place.id);
+                    return (
+                      <Pressable key={place.id} accessibilityRole="button" onPress={() => onOpenPlaces("all", selectedMapDestination)} style={[styles.guideTopCard, styles.guideDesktopTopCard]}>
+                        <Text style={styles.guideTopRank}>#{index + 1}</Text>
+                        <View style={styles.guideTopBody}>
+                          <View style={styles.guideTopBadgeRow}>
+                            <Text style={styles.guideTopBadge}>{safeProfile.shortLabel}</Text>
+                            <Text style={styles.guideTopBadgeMuted}>{safeProfile.badges[0] ?? "망고 검증"}</Text>
+                          </View>
+                          <Text style={styles.guideTopTitle} numberOfLines={1}>{formatMapPlaceName(place.name)}</Text>
+                          <Text style={styles.guideTopReason} numberOfLines={2}>{safeProfile.reason}</Text>
+                          <Text style={styles.guideTopCaution} numberOfLines={1}>{safeProfile.caution}</Text>
+                        </View>
+                        <Pressable accessibilityRole="button" onPress={() => onToggleSavedPlace?.(place.id)} style={[styles.guideTopSave, saved && styles.guideTopSaveActive]}>
+                          <Text style={[styles.guideTopSaveText, saved && styles.guideTopSaveTextActive]}>{saved ? "♥" : "♡"}</Text>
+                        </Pressable>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.guideDesktopRight}>
+              <View style={[styles.guidePanel, styles.guideDesktopPanel]}>
+                <Text style={styles.guideAsideTitle}>오늘의 검증 TOP</Text>
+                <Text style={styles.guideAsideText}>모든 장소 대신 지금 실패 가능성이 낮은 선택지만 먼저 보여줘요.</Text>
+                <View style={styles.guideAsideList}>
+                  {guideTopPlaces.slice(0, 4).map((place, index) => (
+                    <Pressable key={place.id} accessibilityRole="button" onPress={() => onOpenPlaces("all", selectedMapDestination)} style={styles.guideAsideRow}>
+                      <Text style={styles.guideAsideRank}>{index + 1}</Text>
+                      <View style={styles.guideAsideCopy}>
+                        <Text style={styles.guideAsideName} numberOfLines={1}>{formatMapPlaceName(place.name)}</Text>
+                        <Text style={styles.guideAsideMeta} numberOfLines={1}>{getMangoSafeChoiceProfile(place, { surface: "home" }).shortLabel}</Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+                <Pressable accessibilityRole="button" onPress={openPopularPlaces} style={styles.guideAsideButton}>
+                  <Text style={styles.guideAsideButtonText}>검증 리스트 열기</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.guideTrustPanel}>
+                <Text style={styles.guideTrustTitle}>망고베트남은 이런 근거로 추천을 줄여요</Text>
+                <View style={styles.guideTrustGrid}>
+                  <Text style={styles.guideTrustChip}>한국인 후기 밀도</Text>
+                  <Text style={styles.guideTrustChip}>최근 확인일</Text>
+                  <Text style={styles.guideTrustChip}>가격 예측 가능성</Text>
+                  <Text style={styles.guideTrustChip}>웨이팅 리스크</Text>
+                  <Text style={styles.guideTrustChip}>동행 유형 적합도</Text>
+                  <Text style={styles.guideTrustChip}>가기 전 주의점</Text>
+                </View>
+                <Pressable accessibilityRole="button" onPress={() => onOpenPlaces("all", selectedMapDestination)} style={styles.guideMapCta}>
+                  <Text style={styles.guideMapCtaText}>지도로 보조 확인하기</Text>
+                </Pressable>
+              </View>
+
+              <View style={[styles.guidePanel, styles.guideDesktopPanel]}>
+                <Text style={styles.guideAsideTitle}>뉴스레터</Text>
+                <Text style={styles.guideAsideText}>호치민, 다낭, 나트랑의 새 검증 가이드를 주 1회 요약해요.</Text>
+                <Pressable accessibilityRole="button" onPress={openPopularPlaces} style={styles.guideAsideButton}>
+                  <Text style={styles.guideAsideButtonText}>가이드 먼저 보기</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <>
+            <View style={styles.guidePanel}>
+              <View style={styles.guideSectionHeader}>
+                <View>
+                  <Text style={styles.guideSectionKicker}>도시 선택</Text>
+                  <Text style={styles.guideSectionTitle}>어디에서 실패를 줄일까요?</Text>
+                </View>
+                <Text style={styles.guideSectionMeta}>{guideTopPlaces.length}곳 우선 검증</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.guideCityRail}>
+                {mapDestinations.map((destination) => {
+                  const selected = selectedMapDestination === destination;
+                  return (
+                    <Pressable
+                      key={destination}
+                      accessibilityRole="button"
+                      onPress={() => setSelectedMapDestination(destination)}
+                      style={[styles.guideCityChip, selected && styles.guideCityChipActive]}
+                    >
+                      <Text style={[styles.guideCityText, selected && styles.guideCityTextActive]}>{destination}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <View style={styles.guidePanel}>
+              <View style={styles.guideSectionHeader}>
+                <View>
+                  <Text style={styles.guideSectionKicker}>상황별 판단</Text>
+                  <Text style={styles.guideSectionTitle}>음식 종류보다 지금 상황이 먼저예요</Text>
+                </View>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.guideSituationRail}>
+                {guideSituationFilters.map((filter, index) => (
+                  <Pressable
+                    key={filter}
+                    accessibilityRole="button"
+                    onPress={() => onOpenPlaces("all", selectedMapDestination)}
+                    style={[styles.guideSituationChip, index === 0 && styles.guideSituationChipActive]}
+                  >
+                    <Text style={[styles.guideSituationText, index === 0 && styles.guideSituationTextActive]}>{filter}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.guidePanel}>
+              <View style={styles.guideSectionHeader}>
+                <View>
+                  <Text style={styles.guideSectionKicker}>추천 가이드</Text>
+                  <Text style={styles.guideSectionTitle}>{selectedMapDestination}에서 바로 쓰는 판단 리스트</Text>
+                </View>
+              </View>
+              <View style={styles.guideCardList}>
+                {homeGuideCards.map((guide) => (
+                  <Pressable
+                    key={guide.id}
+                    accessibilityRole="button"
+                    onPress={() => onOpenPlaces(guide.filterId, selectedMapDestination)}
+                    style={styles.guideContentCard}
+                  >
+                    <View style={styles.guideContentTop}>
+                      <Text style={styles.guideContentSituation}>{guide.situation}</Text>
+                      <Text style={styles.guideContentUpdated}>{guide.updatedLabel}</Text>
+                    </View>
+                    <Text style={styles.guideContentTitle}>{guide.title}</Text>
+                    <Text style={styles.guideContentCopy}>{guide.copy}</Text>
+                    <View style={styles.guideContentFooter}>
+                      <Text style={styles.guideContentTarget}>{guide.target}</Text>
+                      <Text style={styles.guideContentPlaces} numberOfLines={1}>{guide.placeNames.join(" · ")}</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.guidePanel}>
+              <View style={styles.guideSectionHeader}>
+                <View>
+                  <Text style={styles.guideSectionKicker}>오늘의 검증 TOP</Text>
+                  <Text style={styles.guideSectionTitle}>먼저 이 8곳만 봐도 충분해요</Text>
+                </View>
+                <Pressable accessibilityRole="button" onPress={openPopularPlaces} style={styles.guideSmallButton}>
+                  <Text style={styles.guideSmallButtonText}>전체 보기</Text>
+                </Pressable>
+              </View>
+              <View style={styles.guideTopList}>
+                {guideTopPlaces.slice(0, 4).map((place, index) => {
+                  const safeProfile = getMangoSafeChoiceProfile(place, { surface: "home", categoryId: "food" });
+                  const saved = savedPlaceIds.includes(place.id);
+                  return (
+                    <Pressable key={place.id} accessibilityRole="button" onPress={() => onOpenPlaces("all", selectedMapDestination)} style={styles.guideTopCard}>
+                      <Text style={styles.guideTopRank}>#{index + 1}</Text>
+                      <View style={styles.guideTopBody}>
+                        <View style={styles.guideTopBadgeRow}>
+                          <Text style={styles.guideTopBadge}>{safeProfile.shortLabel}</Text>
+                          <Text style={styles.guideTopBadgeMuted}>{safeProfile.badges[0] ?? "망고 검증"}</Text>
+                        </View>
+                        <Text style={styles.guideTopTitle} numberOfLines={1}>{formatMapPlaceName(place.name)}</Text>
+                        <Text style={styles.guideTopReason} numberOfLines={2}>{safeProfile.reason}</Text>
+                        <Text style={styles.guideTopCaution} numberOfLines={1}>{safeProfile.caution}</Text>
+                      </View>
+                      <Pressable accessibilityRole="button" onPress={() => onToggleSavedPlace?.(place.id)} style={[styles.guideTopSave, saved && styles.guideTopSaveActive]}>
+                        <Text style={[styles.guideTopSaveText, saved && styles.guideTopSaveTextActive]}>{saved ? "♥" : "♡"}</Text>
+                      </Pressable>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.guideTrustPanel}>
+              <Text style={styles.guideTrustTitle}>망고베트남은 이런 근거로 추천을 줄여요</Text>
+              <View style={styles.guideTrustGrid}>
+                <Text style={styles.guideTrustChip}>한국인 후기 밀도</Text>
+                <Text style={styles.guideTrustChip}>최근 확인일</Text>
+                <Text style={styles.guideTrustChip}>가격 예측 가능성</Text>
+                <Text style={styles.guideTrustChip}>웨이팅 리스크</Text>
+                <Text style={styles.guideTrustChip}>동행 유형 적합도</Text>
+                <Text style={styles.guideTrustChip}>가기 전 주의점</Text>
+              </View>
+              <Pressable accessibilityRole="button" onPress={() => onOpenPlaces("all", selectedMapDestination)} style={styles.guideMapCta}>
+                <Text style={styles.guideMapCtaText}>지도로 보조 확인하기</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
+      </ScrollView>
+
+      {false ? (
+      <View style={[styles.referenceMapStage, isDesktop && styles.referenceMapStageDesktop]}>
+        <View style={styles.referenceMapCanvas}>
+          <InteractiveHomeMap html={mapHtml} />
+        </View>
+
+        <View pointerEvents="box-none" style={[styles.referenceTopOverlay, isCompactMobile && styles.referenceTopOverlayCompact]}>
+          <View style={[styles.referenceStatusBar, isCompactMobile && styles.referenceStatusBarCompact]}>
+            <Text style={[styles.referenceStatusTime, isCompactMobile && styles.referenceStatusTimeCompact]}>19:09</Text>
+            <View style={styles.referenceStatusRight}>
+              <Text style={[styles.referenceSignalText, isCompactMobile && styles.referenceSignalTextCompact]}>▦ 5G</Text>
+              <Text style={[styles.referenceBatteryText, isCompactMobile && styles.referenceBatteryTextCompact]}>47</Text>
+            </View>
+          </View>
+
+          <Pressable accessibilityRole="button" onPress={openPopularPlaces} style={[styles.referenceSearchBar, isCompactMobile && styles.referenceSearchBarCompact]}>
+            <Text style={[styles.referenceSearchIcon, isCompactMobile && styles.referenceSearchIconCompact]}>⌕</Text>
+            <Text numberOfLines={1} style={[styles.referenceSearchText, isCompactMobile && styles.referenceSearchTextCompact]}>
+              한국인이 실패하지 않을 베트남 맛집 지도
+            </Text>
+          </Pressable>
+
+          <Pressable accessibilityRole="button" onPress={openPopularPlaces} style={[styles.referenceMapSearchPill, isCompactMobile && styles.referenceMapSearchPillCompact]}>
+            <Text style={[styles.referenceRefreshIcon, isCompactMobile && styles.referenceRefreshIconCompact]}>↻</Text>
+            <Text style={[styles.referenceMapSearchText, isCompactMobile && styles.referenceMapSearchTextCompact]}>검증 맛집 TOP 8 보기</Text>
+          </Pressable>
+        </View>
+
+        {sheetSnap !== "full" ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={openNearbyPlaces}
+            style={[
+              styles.referenceLocateButton,
+              {
+                bottom: locateBottom,
+                width: locateButtonSize,
+                height: locateButtonSize,
+                borderRadius: locateButtonSize / 2
+              }
+            ]}
+          >
+            <Text style={[styles.referenceLocateIcon, isCompactMobile && styles.referenceLocateIconCompact]}>⌖</Text>
+          </Pressable>
+        ) : null}
+
+        <View style={[styles.referenceBottomSheet, isCompactMobile && styles.referenceBottomSheetCompact, { height: sheetHeight, bottom: navOffset }]} {...sheetPanResponder.panHandlers}>
+          <Pressable accessibilityRole="button" onPress={expandSheet} style={styles.referenceSheetHandleHit}>
+            <View style={styles.referenceSheetHandle} />
+          </Pressable>
+          <View style={[styles.referenceSheetTopLine, isCompactMobile && styles.referenceSheetTopLineCompact]}>
+            <View style={styles.referenceSheetTitleWrap}>
+              <Text numberOfLines={1} style={[styles.referenceSheetTitle, isCompactMobile && styles.referenceSheetTitleCompact]}>
+                오늘 믿고 고를 {selectedCategoryDisplayLabel}
+              </Text>
+              <Text numberOfLines={1} style={[styles.referenceSheetSubtitle, isCompactMobile && styles.referenceSheetSubtitleCompact]}>
+                {selectedMapDestination} · 한국인 후기와 최근 확인 기준
+              </Text>
+            </View>
+            <Pressable accessibilityRole="button" onPress={onOpenSavedPlaces ?? openPopularPlaces} style={[styles.referenceSavedShortcut, isCompactMobile && styles.referenceSavedShortcutCompact]}>
+              <Text style={styles.referenceSavedShortcutText}>찜</Text>
+            </Pressable>
+            <Text style={styles.referenceSheetSnapText}>{sheetSnap === "peek" ? "추천" : sheetSnap === "mid" ? "목록" : "전체"}</Text>
+          </View>
+
+          {sheetSnap !== "peek" ? (
+          <View style={styles.referenceSegment}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => onOpenPlaces(selectedCategory.filterId, selectedMapDestination)}
+              style={[styles.referenceSegmentButton, styles.referenceSegmentButtonActive]}
+            >
+              <Text numberOfLines={1} style={[styles.referenceSegmentText, styles.referenceSegmentTextActive]}>
+                검증 {selectedCategoryDisplayLabel}
+              </Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={onOpenSavedPlaces ?? openPopularPlaces} style={styles.referenceSegmentButton}>
+              <Text numberOfLines={1} style={styles.referenceSegmentText}>
+                저장한 선택
+              </Text>
+            </Pressable>
+          </View>
+          ) : null}
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={[styles.referenceFilterScroll, isCompactMobile && styles.referenceFilterScrollCompact]}
+            contentContainerStyle={[styles.referenceCategoryChips, isCompactMobile && styles.referenceCategoryChipsCompact]}
+          >
+            {mapCategories.map((category) => {
+              const selected = selectedCategoryId === category.id;
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  key={category.id}
+                  onPress={() => setSelectedCategoryId(category.id)}
+                  style={[styles.referenceCategoryChip, selected && styles.referenceCategoryChipActive]}
+                >
+                  <Text numberOfLines={1} style={[styles.referenceCategoryText, selected && styles.referenceCategoryTextActive]}>
+                    {category.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {sheetSnap !== "peek" ? (
+            <View style={styles.referenceBadgeRow}>
+              <Text style={styles.referenceMangoBadge}>망고 검증</Text>
+              <Text style={styles.referenceRisingBadge}>검증 기준</Text>
+              <Pressable accessibilityRole="button" onPress={openReportFromHome} style={styles.referenceMiniGhostButton}>
+                <Text style={styles.referenceMiniGhostText}>제보</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          {sheetSnap !== "peek" ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.referenceSituationScroll}
+              contentContainerStyle={styles.referenceSituationChips}
+            >
+              {safeSituationFilters.map((filter, index) => (
+                <Text key={filter} style={[styles.referenceSituationChip, index === 0 && styles.referenceSituationChipActive]}>
+                  {filter}
+                </Text>
+              ))}
+            </ScrollView>
+          ) : null}
+
+          <View style={[styles.referenceResultBlock, sheetSnap === "peek" && styles.referenceResultBlockPeek]}>
+            {selectedMapMarkerCount > 0 ? (
+              <>
+                {sheetSnap === "full" ? (
+                  <View style={styles.referenceResultHeader}>
+                    <View style={[styles.referenceResultIcon, { backgroundColor: selectedCategory.dot }]}>
+                      <Text style={styles.referenceResultIconText}>{selectedCategory.icon}</Text>
+                    </View>
+                    <View style={styles.referenceResultCopyWrap}>
+                      <Text style={styles.referenceResultEyebrow}>오늘의 검증 추천</Text>
+                      <Text numberOfLines={1} style={styles.referenceResultTitle}>
+                        {visibleFocusedPlace ? formatMapPlaceName(visibleFocusedPlace?.name ?? selectedCategory.label) : "검증 TOP 선택지"}
+                      </Text>
+                      <Text numberOfLines={2} style={styles.referenceResultCopy}>
+                        {visibleFocusedPlace
+                          ? getMangoSafeChoiceProfile(visibleFocusedPlace!, { surface: "map", categoryId: selectedCategory.id }).reason
+                          : `모든 장소가 아니라 실패 확률 낮은 ${visibleMapMarkerCount}곳만 먼저 보여줘요`}
+                      </Text>
+                    </View>
+                  </View>
+                ) : null}
+
+                {sheetSnap === "full" ? (
+                  <>
+                    <View style={styles.referenceStatsRow}>
+                      <View style={styles.referenceStatPill}>
+                        <Text style={styles.referenceStatLabel}>검증 TOP</Text>
+                        <Text style={styles.referenceStatValue}>{verifiedHomeTopCount}곳</Text>
+                      </View>
+                      <View style={styles.referenceStatPill}>
+                        <Text style={styles.referenceStatLabel}>TOP 표시</Text>
+                        <Text style={styles.referenceStatValue}>{visibleMapMarkerCount}곳</Text>
+                      </View>
+                      <View style={styles.referenceStatPill}>
+                        <Text style={styles.referenceStatLabel}>현지 날씨</Text>
+                        <Text style={styles.referenceStatValue}>{formatWeatherValue(liveInfo)}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.referenceActionRow}>
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => onOpenPlaces(selectedCategory.filterId, selectedMapDestination)}
+                        style={styles.referencePrimaryButton}
+                      >
+                        <Text style={styles.referencePrimaryButtonText}>검증 리스트 보기</Text>
+                      </Pressable>
+                      <Pressable accessibilityRole="button" onPress={openReportFromHome} style={styles.referenceSecondaryButton}>
+                        <Text style={styles.referenceSecondaryButtonText}>제보</Text>
+                      </Pressable>
+                    </View>
+                  </>
+                ) : null}
+
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  style={[styles.referencePlaceList, sheetSnap === "peek" && styles.referencePlaceListPeek]}
+                  contentContainerStyle={[
+                    styles.referencePlaceListContent,
+                    sheetSnap === "peek" && styles.referencePlaceListContentPeek,
+                    sheetSnap === "mid" && styles.referencePlaceListContentMid,
+                    { paddingBottom: sheetSnap === "peek" ? 6 : navOffset + 16 }
+                  ]}
+                >
+                    {selectedMapPlaces.map((place, index) => {
+                      const saved = savedPlaceIds.includes(place.id);
+                      const imageUrl = getFocusedPlaceImageUrl(place);
+                      const safeProfile = getMangoSafeChoiceProfile(place, { surface: "home", categoryId: selectedCategory.id });
+                      return (
+                        <Pressable
+                          accessibilityRole="button"
+                          key={place.id}
+                          onPress={() => onOpenPlaces(selectedCategory.filterId, selectedMapDestination)}
+                          style={[styles.referencePlaceCard, sheetSnap === "peek" && styles.referencePlaceCardPeek]}
+                        >
+                          {imageUrl ? (
+                            <Image source={{ uri: imageUrl }} style={[styles.referencePlaceImage, sheetSnap === "peek" && styles.referencePlaceImagePeek]} />
+                          ) : (
+                            <View style={[styles.referencePlaceImage, sheetSnap === "peek" && styles.referencePlaceImagePeek, styles.referencePlaceImageEmpty]}>
+                              <Text style={styles.referencePlaceImageText}>{selectedCategory.icon}</Text>
+                            </View>
+                          )}
+                          <View style={styles.referencePlaceBody}>
+                            <View style={styles.referencePlaceBadges}>
+                              <Text numberOfLines={1} style={styles.referenceRankBadge}>
+                                #{index + 1} {safeProfile.shortLabel}
+                              </Text>
+                              {isMangoRecentlyRisingPlace(place, { surface: "home", categoryId: selectedCategory.id }) ? (
+                                <Text numberOfLines={1} style={styles.referenceHotBadge}>
+                                  최근 급상승
+                                </Text>
+                              ) : null}
+                            </View>
+                            <Text numberOfLines={1} style={styles.referencePlaceTitle}>
+                              {formatMapPlaceName(place.name)}
+                            </Text>
+                            <Text numberOfLines={1} style={styles.referencePlaceMeta}>
+                              {safeProfile.label} · {getDisplayHomeCategory(place.category)}
+                            </Text>
+                            {sheetSnap !== "peek" ? (
+                              <Text numberOfLines={2} style={styles.referencePlaceReason}>
+                                {safeProfile.reason}
+                              </Text>
+                            ) : null}
+                            {sheetSnap !== "peek" ? (
+                              <>
+                                <Text numberOfLines={1} style={styles.referencePlaceCaution}>
+                                  {safeProfile.caution}
+                                </Text>
+                                <Text numberOfLines={1} style={styles.referencePlaceDistance}>
+                                  {formatHomeDistanceLabel(place, index)}
+                                </Text>
+                              </>
+                            ) : null}
+                          </View>
+                          <Pressable
+                            accessibilityRole="button"
+                            onPress={() => onToggleSavedPlace?.(place.id)}
+                            style={[styles.referenceSaveButton, saved && styles.referenceSaveButtonActive]}
+                          >
+                            <Text style={[styles.referenceSaveButtonText, saved && styles.referenceSaveButtonTextActive]}>
+                              {saved ? "♥" : "♡"}
+                            </Text>
+                          </Pressable>
+                        </Pressable>
+                      );
+                    })}
+                </ScrollView>
+              </>
+            ) : (
+              <View style={styles.referenceEmptyState}>
+                <Text style={styles.referenceEmptyIcon}>⌕</Text>
+                <Text style={styles.referenceEmptyText}>반경 내에 {selectedCategoryDisplayLabel}이 없습니다</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+      ) : null}
+      {false ? (
+      <>
       <View pointerEvents="none" style={styles.nightScanline} />
       <View pointerEvents="none" style={styles.neonSweep} />
       <ScrollView
-        style={[styles.phone, isDesktop && styles.phoneDesktop]}
+        style={[styles.phone, styles.legacyMapHidden, isDesktop && styles.phoneDesktop]}
         contentContainerStyle={[styles.phoneContent, isDesktop && styles.phoneContentDesktop]}
         showsVerticalScrollIndicator={false}
       >
@@ -390,8 +1077,8 @@ export function HomeScreen({
           <View style={styles.brandLockup}>
             <BrandLogo size={62} />
             <View style={styles.brandCopy}>
-              <Text style={styles.brand}>MANGOMAP</Text>
-              <Text style={styles.subBrand}>베트남 여행자 현지맵</Text>
+              <Text style={styles.brand}>망고베트남</Text>
+              <Text style={styles.subBrand}>실패하지 않는 베트남 가이드</Text>
             </View>
           </View>
           <Pressable accessibilityRole="button" onPress={openPopularPlaces} style={styles.searchButton}>
@@ -399,74 +1086,15 @@ export function HomeScreen({
           </Pressable>
         </View>
 
-        <View style={styles.topSavedSection}>
-          <View style={styles.topSavedHeader}>
-            <View style={styles.topSavedHeaderCopy}>
-              <Text style={styles.topSavedEyebrow}>오늘의 선택</Text>
-              <Text style={styles.topSavedTitle}>오늘 한국인이 가장 많이 저장한 장소</Text>
-              <Text style={styles.topSavedCopy}>사진, 후기, 최근 확인 상태를 먼저 보고 실패 확률 낮은 곳부터 고르세요.</Text>
-            </View>
-            <Text style={styles.topSavedBadge}>{topSavedPlaces.length}곳</Text>
+        <View style={styles.mapIntroPanel}>
+          <View>
+            <Text style={styles.mapIntroEyebrow}>망고베트남 지도</Text>
+            <Text style={styles.mapIntroTitle}>검증된 장소만 지도에서 바로 보기</Text>
+            <Text style={styles.mapIntroCopy}>카테고리를 고르면 해당 장소만 지도와 하단 카드에 표시돼요.</Text>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topSavedRail}>
-            {topSavedPlaces.map((place, index) => (
-              <TopSavedPlaceCard
-                key={place.id}
-                place={place}
-                rank={index + 1}
-                onPress={() => {
-                  trackEvent("view_place", { placeId: place.id, source: "home_top_saved", city: selectedMapDestination });
-                  onOpenPlaces(getMapCategoryIdFromPlace(place), selectedMapDestination);
-                }}
-              />
-            ))}
-          </ScrollView>
-        </View>
-
-        <View style={styles.todayPanel}>
-          <View style={styles.todayHeader}>
-            <View style={styles.todayHeaderCopy}>
-              <Text style={styles.todayEyebrow}>{selectedMapDestination} 여행중?</Text>
-              <Text style={styles.todayTitle}>한국인들이 직접 저장한 맛집 · 마사지 · 카페만 모았습니다.</Text>
-              <Text style={styles.todayCopy}>실패 없는 여행지 찾기</Text>
-            </View>
-            <View style={styles.todayReactionBadge}>
-              <Text style={styles.todayReactionValue}>한국어</Text>
-              <Text style={styles.todayReactionLabel}>후기 지도</Text>
-            </View>
-          </View>
-
-          <View style={styles.heroCtaRow}>
-            <Pressable accessibilityRole="button" onPress={openNearbyPlaces} style={styles.heroPrimaryCta}>
-              <Text style={styles.heroPrimaryText}>내 주변 장소 보기</Text>
-            </Pressable>
-            <Pressable accessibilityRole="button" onPress={openPopularPlaces} style={styles.heroSecondaryCta}>
-              <Text style={styles.heroSecondaryText}>인기 장소 보기</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.trustSignalGrid}>
-            <TrustSignalCard title="한국어 후기 기반" value="맛·가격·분위기" copy="한국인 여행자 기준으로 실패 확률을 줄여요." />
-            <TrustSignalCard title="최근 확인된 장소" value="영업·주소 체크" copy="방문 전 바뀐 정보가 있는지 확인해요." />
-            <TrustSignalCard title="여행자/현지인 제보" value="검토 후 반영" copy="좋은 장소와 오류 제보를 지도 품질로 쌓아요." onPress={openReportFromHome} />
-          </View>
-
-          <View style={styles.todayHotList}>
-            <View style={styles.todaySectionHeader}>
-              <Text style={styles.todaySectionTitle}>최근 한국인 후기</Text>
-              <Text style={styles.todaySectionMeta}>방문 팁</Text>
-            </View>
-            {recentKoreanReviews.map((item) => (
-              <RecentKoreanReviewCard
-                key={item.id}
-                item={item}
-                onPress={() => {
-                  trackEvent("view_place", { placeId: item.place.id, source: "home_recent_review", city: selectedMapDestination });
-                  onOpenPlaces(getMapCategoryIdFromPlace(item.place), selectedMapDestination);
-                }}
-              />
-            ))}
-          </View>
+          <Pressable accessibilityRole="button" onPress={openPopularPlaces} style={styles.mapIntroButton}>
+            <Text style={styles.mapIntroButtonText}>인기 장소</Text>
+          </Pressable>
         </View>
 
         <View style={styles.controlPanel}>
@@ -474,7 +1102,7 @@ export function HomeScreen({
             <Text style={styles.controlLabel}>도시 선택</Text>
             <Text style={styles.controlHint}>지도 중심 변경</Text>
           </View>
-          <View style={styles.cityRail}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cityRailScroll} contentContainerStyle={styles.cityRail}>
             {mapDestinations.map((destination) => {
               const selected = selectedMapDestination === destination;
               return (
@@ -488,7 +1116,7 @@ export function HomeScreen({
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
 
           <View style={styles.controlDivider} />
 
@@ -496,7 +1124,7 @@ export function HomeScreen({
             <Text style={styles.controlLabel}>장소 필터</Text>
             <Text style={styles.controlHint}>{selectedCategory.label} 레이어 보기</Text>
           </View>
-          <View style={styles.categoryRail}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRail}>
             {mapCategories.map((category) => {
               const selected = selectedCategoryId === category.id;
               return (
@@ -504,7 +1132,11 @@ export function HomeScreen({
                   key={category.id}
                   accessibilityRole="button"
                   onPress={() => setSelectedCategoryId(category.id)}
-                  style={[styles.categoryChip, selected && { borderColor: category.dot, backgroundColor: `${category.dot}24` }]}
+                  style={[
+                    styles.categoryChip,
+                    selected && styles.categoryChipActive,
+                    selected && { borderColor: category.dot, backgroundColor: `${category.dot}24` }
+                  ]}
                 >
                   <Text style={styles.categoryEmoji}>{getHomeCategoryEmoji(category.id)}</Text>
                   <View style={styles.categoryTextWrap}>
@@ -514,7 +1146,7 @@ export function HomeScreen({
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
         </View>
 
         <View style={styles.mapCanvas}>
@@ -526,10 +1158,10 @@ export function HomeScreen({
           <View style={styles.sheetHeader}>
             <View>
               <Text style={styles.sheetEyebrow}>{visibleFocusedPlace ? "탐색에서 선택한 장소" : "오늘의 여행 레이어"}</Text>
-              <Text style={styles.sheetTitle}>{visibleFocusedPlace ? formatMapPlaceName(visibleFocusedPlace.name) : selectedCategory.label}</Text>
+              <Text style={styles.sheetTitle}>{visibleFocusedPlace ? formatMapPlaceName(visibleFocusedPlace?.name ?? selectedCategory.label) : selectedCategory.label}</Text>
               <Text style={styles.sheetCopy}>
                 {visibleFocusedPlace
-                  ? `${visibleFocusedPlace.category} · ${visibleFocusedPlace.area ?? selectedMapDestination}`
+                  ? `${visibleFocusedPlace?.category ?? selectedCategory.label} · ${visibleFocusedPlace?.area ?? selectedMapDestination}`
                   : `${selectedCategory.copy} · 확대하면 더 많은 장소가 보여요`}
               </Text>
             </View>
@@ -540,7 +1172,7 @@ export function HomeScreen({
 
           <View style={styles.statRow}>
             <InfoPill label="전체 후보" value={`${selectedCategoryCount}곳`} />
-            <InfoPill label="지도 표시" value={`${selectedMapMarkerCount}곳`} />
+            <InfoPill label="지도 표시" value={`${visibleMapMarkerCount}곳`} />
             <InfoPill label="날씨" value={formatWeatherValue(liveInfo)} />
           </View>
 
@@ -561,40 +1193,9 @@ export function HomeScreen({
           </View>
         </View>
 
-        <View style={styles.communityPanel}>
-          <View style={styles.communityHeader}>
-            <View>
-              <Text style={styles.communityEyebrow}>망고맵 품질</Text>
-              <Text style={styles.communityTitle}>한국인 기준으로 더 정확해지는 지도</Text>
-            </View>
-            <Text style={styles.communityLive}>검토중</Text>
-          </View>
-          <View style={styles.communityGrid}>
-            <CommunityAction
-              title="장소 제보"
-              copy="새 장소나 주소·영업시간·사진 오류를 알려주세요."
-              badge="지도 품질"
-              actionLabel="제보하기"
-              onPress={openReportFromHome}
-            />
-            <CommunityAction
-              title="업체/혜택 제안"
-              copy="한국인에게 보여줄 만한 매장과 혜택을 추천해주세요."
-              badge="제휴 후보"
-              actionLabel="제안하기"
-              onPress={() => openQualityRequest("partner")}
-            />
-            <CommunityAction
-              title="정보 수정 요청"
-              copy="폐업, 이전, 가격 변동을 검토 요청할 수 있어요."
-              badge="검토"
-              actionLabel="수정 요청"
-              onPress={() => openQualityRequest("correction")}
-            />
-          </View>
-        </View>
-
       </ScrollView>
+      </>
+      ) : null}
       <QualityRequestSheet
         requestType={qualityRequestType}
         city={selectedMapDestination}
@@ -836,6 +1437,55 @@ function TodayActivityRow({ item, onPress }: { item: HomeActivityItem; onPress: 
   );
 }
 
+function buildHomeSituationGuides(city: MapDestination, places: CuratedPlace[]): HomeGuideCard[] {
+  const topNames = places.slice(0, 3).map((place) => formatMapPlaceName(place.name));
+  const updatedLabel = places[0] ? formatHomeVerifiedLabel(places[0]) : "최근 확인 준비중";
+  const fallbackNames = topNames.length > 0 ? topNames : ["검증 후보 준비중"];
+
+  return [
+    {
+      id: "first-dinner",
+      situation: "첫날 저녁",
+      title: `${city} 첫날 저녁 실패 낮은 식당 7곳`,
+      target: "초행자 · 커플 · 가족",
+      copy: "도착 첫날에는 맛보다 동선, 가격, 주문 난이도가 더 중요해요.",
+      placeNames: fallbackNames,
+      updatedLabel,
+      filterId: "all"
+    },
+    {
+      id: "parents",
+      situation: "부모님",
+      title: `부모님 모시고 가기 무난한 ${city} 식당`,
+      target: "가족여행 · 노부모 동반",
+      copy: "좌석, 청결, 메뉴 선택, 택시 접근성을 먼저 보는 리스트예요.",
+      placeNames: fallbackNames,
+      updatedLabel,
+      filterId: "korean"
+    },
+    {
+      id: "local-beginner",
+      situation: "로컬 입문",
+      title: `베트남 음식 초보도 실패 적은 ${city} 로컬 맛집`,
+      target: "첫 방문 · 현지식 입문",
+      copy: "로컬 분위기는 살리되 주문과 맛의 호불호 리스크를 낮췄어요.",
+      placeNames: fallbackNames,
+      updatedLabel,
+      filterId: "vietnamese"
+    },
+    {
+      id: "business",
+      situation: "접대",
+      title: `한국 손님 접대할 때 무난한 ${city} 식당`,
+      target: "출장자 · 거주자",
+      copy: "분위기, 예약, 가격 예측 가능성을 함께 보는 접대 후보예요.",
+      placeNames: fallbackNames,
+      updatedLabel,
+      filterId: "all"
+    }
+  ];
+}
+
 function countHomeCategoryPlaces(destination: MapDestination, category: MapCategory) {
   const count = getHomeMapPlaces(destination, category.id).length;
   return count || cityCounts[category.id] || 0;
@@ -848,17 +1498,20 @@ function countHomeMappableCategoryPlaces(destination: MapDestination, category: 
 function getHomeCategoryEmoji(categoryId: string) {
   const emojis: Record<string, string> = {
     food: "🍜",
+    vietnamese: "VN",
     cafe: "☕",
     massage: "💆",
-    market: "🛍️",
-    exchange: "💱",
-    photo: "📍"
+    rooftop: "🍸",
+    korean: "한",
+    chinese: "中",
+    japanese: "日",
+    tour: "📍"
   };
   return emojis[categoryId] ?? "📌";
 }
 
 function getHomeKoreanReviewCount(place: CuratedPlace) {
-  return Math.max(place.reviews?.length ?? 0, place.koreanReviewSignal?.reviewCount ?? 0, getMangoCommentCount(place));
+  return getMangoCommentCount(place);
 }
 
 function formatHomeVerifiedLabel(place: CuratedPlace) {
@@ -878,7 +1531,7 @@ function formatHomeVerifiedLabel(place: CuratedPlace) {
 function buildRecentKoreanReviews(places: CuratedPlace[]): HomeReviewItem[] {
   return places
     .flatMap((place) =>
-      (place.reviews ?? []).slice(0, 2).map((review, index) => ({
+      getRealisticPlaceReviews(place, 2).slice(0, 2).map((review, index) => ({
         id: `${place.id}-${index}`,
         place,
         nickname: review.nickname || "여행자",
@@ -892,10 +1545,7 @@ function buildRecentKoreanReviews(places: CuratedPlace[]): HomeReviewItem[] {
 }
 
 function getTodayHotScore(place: CuratedPlace) {
-  const koreanSignal = (place.koreanReviewSignal?.score ?? 0) * 10;
-  const mangoReviewWeight = getHomeKoreanReviewCount(place) * 18;
-  const savedWeight = getMangoRecommendationCount(place) * 8;
-  return (place.rating ?? 0) * 18 + koreanSignal + mangoReviewWeight + savedWeight;
+  return getMangoRankScore(place, { surface: "home" });
 }
 
 function formatHomePlaceRating(place: CuratedPlace) {
@@ -1004,17 +1654,65 @@ function getHomeMapPlaces(destination: MapDestination, categoryId: string) {
 }
 
 function getHomeSafeMapPlaces(destination: MapDestination, categoryId: string) {
-  return getHomeMapPlaces(destination, categoryId).filter((place) => hasSafeHomeMapCoordinates(place, destination));
+  return getHomeMapPlaces(destination, categoryId)
+    .filter((place) => hasSafeHomeMapCoordinates(place, destination))
+    .sort((left, right) => compareMangoSafeChoices(left, right, { surface: "map", categoryId }));
 }
 
 function matchHomeCategory(place: CuratedPlace, categoryId: string) {
-  if (categoryId === "food") return place.category === "맛집";
-  if (categoryId === "cafe") return place.category === "카페";
-  if (categoryId === "massage") return place.category === "마사지";
-  if (categoryId === "market") return place.category === "쇼핑";
-  if (categoryId === "exchange") return place.category === "환전";
-  if (categoryId === "photo") return ["사진명소", "바/루프탑", "가라오케", "투어/액티비티"].includes(place.category);
+  if (categoryId === "food") return isHomeFoodGuidePlace(place);
+  if (categoryId === "vietnamese") return isVietnameseHomePlace(place);
+  if (categoryId === "cafe") return matchesStrictCategory(place, "cafe");
+  if (categoryId === "massage") return matchesStrictCategory(place, "massage");
+  if (categoryId === "rooftop") return matchesStrictCategory(place, "rooftop");
+  if (categoryId === "korean") return matchesStrictCategory(place, "korean");
+  if (categoryId === "chinese") return isChineseHomePlace(place);
+  if (categoryId === "japanese") return isJapaneseHomePlace(place);
+  if (categoryId === "tour" || categoryId === "photo") return matchesStrictCategory(place, "tour");
   return false;
+}
+
+function isHomeFoodGuidePlace(place: CuratedPlace) {
+  if (isHomeNonFoodGuideCategory(place)) return false;
+  return place.category === "맛집" || place.category === "카페" || matchesStrictCategory(place, "korean") || isChineseHomePlace(place) || isJapaneseHomePlace(place);
+}
+
+function isHomeNonFoodGuideCategory(place: CuratedPlace) {
+  return ["마사지", "바/루프탑", "가라오케", "쇼핑", "환전", "사진명소", "투어/액티비티"].includes(place.category);
+}
+
+function isChineseHomePlace(place: CuratedPlace) {
+  const haystack = `${place.name} ${place.category} ${place.tags.join(" ")}`.toLowerCase();
+  return (
+    place.tags.includes("중식당") ||
+    place.tags.includes("한국식중식") ||
+    haystack.includes("chinese") ||
+    haystack.includes("jjamppong") ||
+    haystack.includes("jjambbong") ||
+    haystack.includes("jajang") ||
+    haystack.includes("dim sum") ||
+    haystack.includes("딤섬") ||
+    haystack.includes("짬뽕") ||
+    haystack.includes("짜장")
+  );
+}
+
+function isVietnameseHomePlace(place: CuratedPlace) {
+  return place.category === "맛집" && !matchesStrictCategory(place, "korean") && !isChineseHomePlace(place) && !isJapaneseHomePlace(place);
+}
+
+function isJapaneseHomePlace(place: CuratedPlace) {
+  const haystack = `${place.name} ${place.category} ${place.tags.join(" ")}`.toLowerCase();
+  return (
+    place.tags.includes("일식당") ||
+    haystack.includes("japanese") ||
+    haystack.includes("sushi") ||
+    haystack.includes("ramen") ||
+    haystack.includes("izakaya") ||
+    haystack.includes("스시") ||
+    haystack.includes("라멘") ||
+    haystack.includes("이자카야")
+  );
 }
 
 function hasSafeHomeMapCoordinates(place: CuratedPlace, destination: MapDestination) {
@@ -1044,18 +1742,10 @@ function getHomeMapCoordinates(place: CuratedPlace) {
 }
 
 function getMapCategoryIdFromPlace(place: CuratedPlace) {
-  const categoryMap: Record<CuratedPlaceCategory, string> = {
-    맛집: "food",
-    카페: "cafe",
-    마사지: "massage",
-    "바/루프탑": "photo",
-    쇼핑: "market",
-    사진명소: "photo",
-    환전: "exchange",
-    가라오케: "photo",
-    "투어/액티비티": "photo"
-  };
-  return categoryMap[place.category] ?? "food";
+  const category = getStrictPlaceCategory(place);
+  if (isChineseHomePlace(place)) return "chinese";
+  if (isJapaneseHomePlace(place)) return "japanese";
+  return category === "tour" ? "photo" : category;
 }
 
 function formatMapPlaceName(name: string) {
@@ -1068,6 +1758,12 @@ function formatMapPlaceName(name: string) {
 
 function getDisplayHomeCategory(category: CuratedPlace["category"]) {
   return category === "사진명소" ? "관광명소" : category;
+}
+
+function formatHomeDistanceLabel(place: CuratedPlace, index: number) {
+  const distanceKm = Math.max(0.4, Math.min(6.8, 0.5 + index * 0.4));
+  const area = place.area ? `${place.area} · ` : "";
+  return `${area}${distanceKm.toFixed(1)}km`;
 }
 
 function InteractiveHomeMap({ html }: { html: string }) {
@@ -1085,7 +1781,7 @@ function InteractiveHomeMap({ html }: { html: string }) {
       loading: "lazy",
       allowFullScreen: true,
       referrerPolicy: "no-referrer-when-downgrade",
-      title: "MANGOMAP live Google map"
+      title: "Mango Vietnam live Google map"
     } as any);
   }
 
@@ -1183,11 +1879,11 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
   const baseZoom = cityZoom[destination];
   const initialZoom = focusCenter ? 16 : baseZoom;
   const focusedZoom = destination === "푸꾸옥" || destination === "호치민" ? 16 : 17;
-  const selectedMarkerLimit = Math.max(24, Math.min(getHomeSafeMapPlaces(destination, selectedCategory.id).length, 160));
-  const initialSelectedMarkerLimit = Math.min(selectedMarkerLimit, destination === "호치민" ? 36 : 28);
+  const selectedMarkerLimit = Math.min(getHomeSafeMapPlaces(destination, selectedCategory.id).length, 8);
   const markers = mapCategories.flatMap((category) =>
-    getGoogleBackedMapSpots(destination, category, citySpots[destination][category.id] ?? [], category.id === selectedCategory.id ? selectedMarkerLimit : 3).map((spot, index) => {
+    getGoogleBackedMapSpots(destination, category, citySpots[destination][category.id] ?? [], category.id === selectedCategory.id ? selectedMarkerLimit : 0).map((spot, index) => {
       const activeCategory = category.id === selectedCategory.id;
+      const markerOffset = activeCategory ? getHomeMarkerOffset(index) : { lat: 0, lng: 0 };
       return {
         id: category.id,
         title: spot.title,
@@ -1205,11 +1901,13 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
         address: spot.address,
         bestTime: spot.bestTime,
         checkHint: spot.checkHint,
-        labelVisible: activeCategory && index < 4,
-        visibleFromZoom: activeCategory ? (index < initialSelectedMarkerLimit ? baseZoom : index < 88 ? baseZoom + 1 : baseZoom + 2) : baseZoom + 2,
-        labelFromZoom: activeCategory ? (index < 4 ? baseZoom : index < 12 ? baseZoom + 1 : 16) : 16,
-        lat: spot.coordinates.lat,
-        lng: spot.coordinates.lng,
+        rank: index + 1,
+        markerLabel: activeCategory ? `#${index + 1}` : category.label,
+        labelVisible: activeCategory && index === 0,
+        visibleFromZoom: activeCategory ? baseZoom : baseZoom + 3,
+        labelFromZoom: activeCategory ? baseZoom + 2 : 16,
+        lat: spot.coordinates.lat + markerOffset.lat,
+        lng: spot.coordinates.lng + markerOffset.lng,
         color: category.dot
       };
     })
@@ -1219,12 +1917,13 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
     active: marker.id === selectedCategory.id
   }));
   const focusedMapPlace = focusedPlace && focusedCoordinates ? focusedPlace : undefined;
+  const focusedSafeProfile = focusedMapPlace ? getMangoSafeChoiceProfile(focusedMapPlace, { surface: "map", categoryId: selectedCategory.id }) : undefined;
   const focusMarker = focusedMapPlace && focusedCoordinates
     ? {
         id: "focused",
         title: formatMapPlaceName(focusedMapPlace.name),
         sub: `${getDisplayHomeCategory(focusedMapPlace.category)} · ${focusedMapPlace.area ?? destination}`,
-        description: buildMapPlaceDescription(focusedMapPlace),
+        description: focusedSafeProfile?.reason ?? buildMapPlaceDescription(focusedMapPlace),
         imageUrl: getFocusedPlaceImageUrl(focusedMapPlace),
         lat: focusedCoordinates.lat,
         lng: focusedCoordinates.lng,
@@ -1240,7 +1939,9 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
         area: focusedMapPlace.area,
         address: getHomeMapAddressLabel(destination, focusedMapPlace),
         bestTime: focusedMapPlace.bestTime[0],
-        checkHint: getMapPlaceCheckHint(focusedMapPlace),
+        checkHint: focusedSafeProfile?.label ?? getMapPlaceCheckHint(focusedMapPlace),
+        rank: 1,
+        markerLabel: "선택",
         labelVisible: true,
         visibleFromZoom: 0,
         labelFromZoom: 0
@@ -1522,23 +2223,37 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
     }
 
     let selectedMarkerEntry = null;
+    function escapeSvgText(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
     function getMarkerIcon(data, selected) {
-      const radius = selected ? (data.id === "focused" ? 23 : 15) : data.id === "focused" ? 22 : data.labelVisible ? 13 : data.active ? 9 : 5;
-      const fillOpacity = selected ? 0.9 : data.id === "focused" ? 0.86 : data.labelVisible ? 0.72 : data.active ? 0.48 : 0.1;
-      const strokeOpacity = selected ? 1 : data.id === "focused" ? 1 : data.active ? 0.9 : 0.18;
+      const text = String(data.markerLabel || (data.active ? "추천" : data.priceLevel || "M"));
+      const width = Math.max(48, Math.min(86, text.length * 16 + 24));
+      const height = selected ? 38 : 32;
+      const bg = selected ? "#111827" : data.active ? "#FFC233" : "#FFFFFF";
+      const fg = selected ? "#FFFFFF" : "#111827";
+      const stroke = data.active ? "#FFB800" : "rgba(17,24,39,0.18)";
+      const svg =
+        "<svg xmlns='http://www.w3.org/2000/svg' width='" + width + "' height='" + height + "' viewBox='0 0 " + width + " " + height + "'>" +
+          "<filter id='s' x='-30%' y='-40%' width='160%' height='190%'><feDropShadow dx='0' dy='5' stdDeviation='5' flood-color='rgba(17,24,39,0.25)'/></filter>" +
+          "<rect x='2' y='2' width='" + (width - 4) + "' height='" + (height - 8) + "' rx='16' fill='" + bg + "' stroke='" + stroke + "' stroke-width='1.5' filter='url(#s)'/>" +
+          "<path d='M" + (width / 2 - 5) + " " + (height - 8) + " L" + (width / 2) + " " + height + " L" + (width / 2 + 5) + " " + (height - 8) + " Z' fill='" + bg + "'/>" +
+          "<text x='50%' y='" + (selected ? 22 : 20) + "' text-anchor='middle' font-family='-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif' font-size='13' font-weight='900' fill='" + fg + "'>" + escapeSvgText(text) + "</text>" +
+        "</svg>";
       return {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: radius,
-        fillColor: data.color,
-        fillOpacity,
-        strokeColor: selected ? "#1F2937" : data.color,
-        strokeOpacity,
-        strokeWeight: selected ? 5 : data.id === "focused" ? 5 : data.labelVisible ? 4 : data.active ? 3 : 2
+        url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
+        scaledSize: new google.maps.Size(width, height),
+        anchor: new google.maps.Point(width / 2, height)
       };
     }
     function clearSelectedMarker() {
       if (selectedMarkerEntry) {
         selectedMarkerEntry.marker.setIcon(getMarkerIcon(selectedMarkerEntry.data, false));
+        selectedMarkerEntry.marker.setZIndex(selectedMarkerEntry.data.active ? 20 : 5);
         selectedMarkerEntry = null;
       }
     }
@@ -1556,6 +2271,7 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
       clearSelectedMarker();
       selectedMarkerEntry = entry;
       entry.marker.setIcon(getMarkerIcon(entry.data, true));
+      entry.marker.setZIndex(80);
       const photo = popup.querySelector(".place-photo[data-image-url]");
       if (photo && photo.dataset.imageUrl) {
         photo.style.backgroundImage = "url('" + photo.dataset.imageUrl.replace(/'/g, "\\\\'") + "')";
@@ -1572,11 +2288,13 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
       const map = new google.maps.Map(document.getElementById("map"), {
         center: { lat: ${lat}, lng: ${lng} },
         zoom: ${initialZoom},
-        disableDefaultUI: false,
+        disableDefaultUI: true,
         fullscreenControl: false,
         mapTypeControl: false,
         streetViewControl: false,
+        zoomControl: false,
         clickableIcons: false,
+        gestureHandling: "greedy",
         styles: mapStyle
       });
       map.addListener("click", closePopup);
@@ -1673,7 +2391,7 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
       renderFallback("EXPO_PUBLIC_GOOGLE_MAPS_API_KEY가 설정되어 있지 않아요.");
     } else {
       const script = document.createElement("script");
-      script.src = "https://maps.googleapis.com/maps/api/js?key=" + encodeURIComponent(apiKey) + "&callback=initMangoMap&language=ko&region=VN";
+      script.src = "https://maps.googleapis.com/maps/api/js?key=" + encodeURIComponent(apiKey) + "&callback=initMangoMap&language=ko&region=VN&loading=async";
       script.async = true;
       script.defer = true;
       script.onerror = () => renderFallback("Google Maps 스크립트 로드에 실패했어요. API 키, 결제 설정, 허용 도메인을 확인해주세요.");
@@ -1682,6 +2400,20 @@ function buildGoogleMapHtml(destination: MapDestination, selectedCategory: MapCa
   </script>
 </body>
 </html>`;
+}
+
+function getHomeMarkerOffset(index: number) {
+  const offsets = [
+    { lat: 0, lng: 0 },
+    { lat: 0.00042, lng: -0.00035 },
+    { lat: -0.00038, lng: 0.00036 },
+    { lat: 0.00032, lng: 0.00042 },
+    { lat: -0.00044, lng: -0.00028 },
+    { lat: 0.00018, lng: -0.00056 },
+    { lat: -0.00022, lng: 0.00058 },
+    { lat: 0.00056, lng: 0.00012 }
+  ];
+  return offsets[index % offsets.length];
 }
 
 const mapDestinationBounds: Record<MapDestination, { lat: [number, number]; lng: [number, number] }> = {
@@ -1706,7 +2438,7 @@ function getGoogleBackedMapSpots(
 ) {
   const places = getHomeSafeMapPlaces(destination, category.id)
     .sort((left, right) => {
-      const mapPriorityScore = getHomeMapPriority(right) - getHomeMapPriority(left);
+      const mapPriorityScore = compareMangoSafeChoices(left, right, { surface: "map", categoryId: category.id });
       if (mapPriorityScore !== 0) return mapPriorityScore;
       const photoScore = Number(Boolean(right.photoName)) - Number(Boolean(left.photoName));
       if (photoScore !== 0) return photoScore;
@@ -1719,10 +2451,11 @@ function getGoogleBackedMapSpots(
       .map((place) => {
         const coordinates = getHomeMapCoordinates(place);
         if (!coordinates) return undefined;
+        const safeProfile = getMangoSafeChoiceProfile(place, { surface: "map", categoryId: category.id });
         return {
           title: formatMapPlaceName(place.name),
           sub: `${getDisplayHomeCategory(place.category)}${place.area ? ` · ${place.area}` : ""}`,
-          description: buildMapPlaceDescription(place),
+          description: safeProfile.reason,
           imageUrl: getFocusedPlaceImageUrl(place),
           mapsUri: place.googleMapsUri,
           query: `${place.name} ${destination}`,
@@ -1735,7 +2468,7 @@ function getGoogleBackedMapSpots(
           priceLevel: place.priceLevel,
           area: place.area,
           bestTime: place.bestTime[0],
-          checkHint: getMapPlaceCheckHint(place)
+          checkHint: safeProfile.label
         };
       })
       .filter((place): place is NonNullable<typeof place> => Boolean(place));
@@ -1794,20 +2527,14 @@ function normalizeHomePlaceDedupeKey(place: CuratedPlace) {
     .replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
-function getHomeMapPriority(place: CuratedPlace) {
-  let score = 0;
-  if (place.tags.includes("지도추천")) score += 1000;
-  if (place.coordinates) score += 120;
-  if (place.googlePlaceId.startsWith("manual-")) score += 30;
-  return score;
-}
-
 function buildMapSpotDescription(destination: MapDestination, category: MapCategory, spotLabel: string) {
   const categoryCopy: Record<string, string> = {
     food: "식사 동선에 넣기 좋은 장소예요. 피크 시간에는 대기 가능성이 있어요.",
     cafe: "더운 낮이나 이동 사이에 쉬어가기 좋은 카페예요.",
     massage: "많이 걷는 날 중간 회복 코스로 넣기 좋아요. 예약 가능 여부를 먼저 보세요.",
     rooftop: "저녁 이후 분위기 전환용으로 보기 좋아요. 귀가는 Grab Car를 추천해요.",
+    chinese: "짬뽕, 딤섬처럼 익숙한 메뉴가 필요할 때 보기 좋은 장소예요.",
+    japanese: "스시, 라멘, 이자카야처럼 가볍게 고르기 좋은 일식 코스예요.",
     market: "기념품과 간식 쇼핑을 한 번에 보기 좋은 장소예요.",
     photo: "사진 남기기 좋은 곳이라 낮 시간대 방문을 먼저 추천해요.",
     exchange: "환율과 지급액을 현장에서 비교하고 소액부터 바꾸는 편이 좋아요.",
@@ -1904,10 +2631,1412 @@ function formatWeatherValue(liveInfo: LiveTravelInfo) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.midnight,
-    overflow: "hidden"
+    backgroundColor: colors.cream,
+    overflow: "hidden",
+    paddingBottom: 0
+  },
+  guideHomeScroll: {
+    flex: 1,
+    backgroundColor: colors.cream
+  },
+  guideHomeContent: {
+    width: "100%",
+    maxWidth: 560,
+    alignSelf: "center",
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 116,
+    gap: 12
+  },
+  guideHomeContentDesktop: {
+    maxWidth: 1360,
+    paddingHorizontal: 36,
+    paddingTop: 26,
+    paddingBottom: 88,
+    gap: 24
+  },
+  guideHero: {
+    borderRadius: 20,
+    padding: 20,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.line,
+    shadowColor: "#25301F",
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 }
+  },
+  guideHeroDesktop: {
+    padding: 34,
+    minHeight: 330
+  },
+  guideHeroTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 16
+  },
+  guideBrandMark: {
+    width: 88,
+    height: 88,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F7F5EF",
+    borderWidth: 1,
+    borderColor: colors.line
+  },
+  guideHeroTrustBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "rgba(15,81,50,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(15,81,50,0.18)"
+  },
+  guideHeroTrustText: {
+    color: colors.greenDeep,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  guideEyebrow: {
+    color: colors.greenDeep,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "800",
+    marginTop: 18
+  },
+  guideHeroTitle: {
+    color: colors.ink,
+    fontSize: 30,
+    lineHeight: 37,
+    fontWeight: "800",
+    marginTop: 8
+  },
+  guideHeroTitleDesktop: {
+    fontSize: 46,
+    lineHeight: 56,
+    maxWidth: 720
+  },
+  guideHeroCopy: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: "600",
+    marginTop: 10
+  },
+  guideHeroActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 18
+  },
+  guidePrimaryButton: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.greenDeep,
+    paddingHorizontal: 12
+  },
+  guidePrimaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  guideGhostButton: {
+    minWidth: 94,
+    minHeight: 52,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: colors.line,
+    paddingHorizontal: 12
+  },
+  guideGhostButtonText: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  guidePanel: {
+    borderRadius: 18,
+    padding: 16,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.line,
+    ...shadow
+  },
+  guideDesktopGrid: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 22
+  },
+  guideDesktopLeft: {
+    width: 250,
+    gap: 16
+  },
+  guideDesktopCenter: {
+    flex: 1,
+    minWidth: 0,
+    gap: 16
+  },
+  guideDesktopRight: {
+    width: 310,
+    gap: 16
+  },
+  guideDesktopPanel: {
+    borderRadius: 18,
+    padding: 18,
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 }
+  },
+  guideDesktopSituationList: {
+    gap: 8
+  },
+  guideDesktopSituationItem: {
+    minHeight: 46,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#F7F5EF",
+    borderWidth: 1,
+    borderColor: colors.line
+  },
+  guideDesktopSituationItemActive: {
+    backgroundColor: colors.greenDeep,
+    borderColor: colors.greenDeep
+  },
+  guideDesktopSituationText: {
+    color: "#374151",
+    fontSize: 14,
+    fontWeight: "700"
+  },
+  guideDesktopSituationTextActive: {
+    color: "#FFFFFF"
+  },
+  guideDesktopSituationArrow: {
+    color: "#9CA3AF",
+    fontSize: 18,
+    fontWeight: "900"
+  },
+  guideDesktopCityGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  guideDesktopCityButton: {
+    minHeight: 38,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F7F5EF",
+    borderWidth: 1,
+    borderColor: colors.line
+  },
+  guideDesktopCityButtonActive: {
+    backgroundColor: "rgba(255,179,33,0.20)",
+    borderColor: colors.cyan
+  },
+  guideDesktopCityText: {
+    color: "#4B5563",
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  guideDesktopCityTextActive: {
+    color: colors.greenDeep
+  },
+  guideSectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 12
+  },
+  guideSectionKicker: {
+    color: colors.greenDeep,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "800"
+  },
+  guideSectionTitle: {
+    color: colors.ink,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: "800",
+    marginTop: 3
+  },
+  guideSectionMeta: {
+    color: colors.greenDeep,
+    backgroundColor: "rgba(15,81,50,0.08)",
+    overflow: "hidden",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 11,
+    fontWeight: "800"
+  },
+  guideCityRail: {
+    flexDirection: "row",
+    gap: 8,
+    paddingRight: 12
+  },
+  guideCityChip: {
+    minHeight: 40,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F7F5EF",
+    borderWidth: 1,
+    borderColor: colors.line
+  },
+  guideCityChipActive: {
+    backgroundColor: "rgba(255,179,33,0.20)",
+    borderColor: colors.cyan
+  },
+  guideCityText: {
+    color: "#4B5563",
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  guideCityTextActive: {
+    color: colors.greenDeep
+  },
+  guideSituationRail: {
+    flexDirection: "row",
+    gap: 8,
+    paddingRight: 12
+  },
+  guideSituationChip: {
+    minHeight: 38,
+    borderRadius: 999,
+    paddingHorizontal: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F7F5EF",
+    borderWidth: 1,
+    borderColor: colors.line
+  },
+  guideSituationChipActive: {
+    backgroundColor: colors.greenDeep,
+    borderColor: colors.greenDeep
+  },
+  guideSituationText: {
+    color: "#4B5563",
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  guideSituationTextActive: {
+    color: "#FFFFFF"
+  },
+  guideCardList: {
+    gap: 10
+  },
+  guideDesktopCardGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12
+  },
+  guideContentCard: {
+    borderRadius: 16,
+    padding: 15,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: colors.line
+  },
+  guideDesktopContentCard: {
+    width: "48.8%",
+    minHeight: 190,
+    padding: 18
+  },
+  guideContentTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10
+  },
+  guideContentSituation: {
+    color: colors.greenDeep,
+    backgroundColor: "rgba(15,81,50,0.08)",
+    overflow: "hidden",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    fontSize: 11,
+    fontWeight: "800"
+  },
+  guideContentUpdated: {
+    color: "#6B7280",
+    fontSize: 11,
+    fontWeight: "900"
+  },
+  guideContentTitle: {
+    color: colors.ink,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: "800",
+    marginTop: 11
+  },
+  guideContentCopy: {
+    color: "#4B5563",
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: "600",
+    marginTop: 6
+  },
+  guideContentFooter: {
+    gap: 4,
+    marginTop: 12
+  },
+  guideContentTarget: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  guideContentPlaces: {
+    color: "#6B7280",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  guideSmallButton: {
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    backgroundColor: "#F7F5EF"
+  },
+  guideSmallButtonText: {
+    color: colors.ink,
+    fontSize: 11,
+    fontWeight: "800"
+  },
+  guideTopList: {
+    gap: 10
+  },
+  guideTopCard: {
+    minHeight: 126,
+    borderRadius: 16,
+    padding: 13,
+    flexDirection: "row",
+    gap: 12,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: colors.line
+  },
+  guideDesktopTopCard: {
+    minHeight: 118
+  },
+  guideTopRank: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    overflow: "hidden",
+    textAlign: "center",
+    lineHeight: 38,
+    color: colors.greenDeep,
+    backgroundColor: "rgba(15,81,50,0.10)",
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  guideTopBody: {
+    flex: 1,
+    minWidth: 0
+  },
+  guideTopBadgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  guideTopBadge: {
+    color: "#0B3D27",
+    backgroundColor: "#EAF8EF",
+    overflow: "hidden",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 10,
+    fontWeight: "800"
+  },
+  guideTopBadgeMuted: {
+    color: "#7A4C00",
+    backgroundColor: "rgba(255,179,33,0.16)",
+    overflow: "hidden",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 10,
+    fontWeight: "900"
+  },
+  guideTopTitle: {
+    color: colors.ink,
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: "800",
+    marginTop: 8
+  },
+  guideTopReason: {
+    color: "#374151",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "600",
+    marginTop: 4
+  },
+  guideTopCaution: {
+    color: "#A16207",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "900",
+    marginTop: 5
+  },
+  guideTopSave: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: colors.line
+  },
+  guideTopSaveActive: {
+    backgroundColor: "rgba(255,179,33,0.16)",
+    borderColor: colors.cyan
+  },
+  guideTopSaveText: {
+    color: "#6B7280",
+    fontSize: 19,
+    fontWeight: "900"
+  },
+  guideTopSaveTextActive: {
+    color: "#D97706"
+  },
+  guideTrustPanel: {
+    borderRadius: 18,
+    padding: 16,
+    backgroundColor: colors.greenDeep,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)"
+  },
+  guideTrustTitle: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    lineHeight: 23,
+    fontWeight: "800"
+  },
+  guideTrustGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12
+  },
+  guideTrustChip: {
+    color: "#F7F5EF",
+    backgroundColor: "rgba(255,255,255,0.09)",
+    overflow: "hidden",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  guideMapCta: {
+    minHeight: 52,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.cyan,
+    marginTop: 15
+  },
+  guideMapCtaText: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  guideAsideTitle: {
+    color: colors.ink,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: "800"
+  },
+  guideAsideList: {
+    gap: 10,
+    marginTop: 12
+  },
+  guideAsideRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    minHeight: 58,
+    borderRadius: 14,
+    padding: 10,
+    backgroundColor: "#F7F5EF",
+    borderWidth: 1,
+    borderColor: colors.line
+  },
+  guideAsideRank: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    overflow: "hidden",
+    textAlign: "center",
+    lineHeight: 28,
+    color: colors.greenDeep,
+    backgroundColor: "rgba(15,81,50,0.10)",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  guideAsideCopy: {
+    flex: 1,
+    minWidth: 0
+  },
+  guideAsideName: {
+    color: colors.ink,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "800"
+  },
+  guideAsideMeta: {
+    color: "#6B7280",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "800",
+    marginTop: 2
+  },
+  guideAsideText: {
+    color: "#4B5563",
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: "800",
+    marginTop: 8
+  },
+  guideAsideButton: {
+    minHeight: 44,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.greenDeep,
+    marginTop: 14
+  },
+  guideAsideButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  referenceMapStage: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 560,
+    alignSelf: "center",
+    position: "relative",
+    overflow: "hidden",
+    backgroundColor: colors.cream
+  },
+  referenceMapStageDesktop: {
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: "rgba(70,88,104,0.14)"
+  },
+  referenceMapCanvas: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: "hidden",
+    backgroundColor: "#EDF2F3"
+  },
+  referenceTopOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    zIndex: 8,
+    paddingHorizontal: 24,
+    paddingTop: 18,
+    alignItems: "center"
+  },
+  referenceTopOverlayCompact: {
+    paddingHorizontal: 18,
+    paddingTop: 10
+  },
+  referenceStatusBar: {
+    width: "100%",
+    minHeight: 32,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 42
+  },
+  referenceStatusBarCompact: {
+    minHeight: 24,
+    paddingHorizontal: 24
+  },
+  referenceStatusTime: {
+    color: "#0F172A",
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: "900"
+  },
+  referenceStatusTimeCompact: {
+    fontSize: 16,
+    lineHeight: 20
+  },
+  referenceStatusRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  referenceSignalText: {
+    color: "#0F172A",
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: "900"
+  },
+  referenceSignalTextCompact: {
+    fontSize: 12,
+    lineHeight: 15
+  },
+  referenceBatteryText: {
+    minWidth: 28,
+    height: 18,
+    borderRadius: 6,
+    overflow: "hidden",
+    textAlign: "center",
+    color: "#FFFFFF",
+    backgroundColor: "#2FC95D",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "900"
+  },
+  referenceBatteryTextCompact: {
+    minWidth: 24,
+    height: 16,
+    borderRadius: 5,
+    fontSize: 10,
+    lineHeight: 16
+  },
+  referenceSearchBar: {
+    width: "100%",
+    minHeight: 72,
+    borderRadius: 36,
+    marginTop: 32,
+    paddingHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: "rgba(255,255,255,0.97)",
+    shadowColor: "#243447",
+    shadowOpacity: 0.16,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8
+  },
+  referenceSearchBarCompact: {
+    minHeight: 58,
+    borderRadius: 29,
+    marginTop: 12,
+    paddingHorizontal: 18,
+    gap: 10,
+    shadowOpacity: 0.13,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 }
+  },
+  referenceSearchIcon: {
+    color: "#F59E0B",
+    fontSize: 34,
+    lineHeight: 38,
+    fontWeight: "800"
+  },
+  referenceSearchIconCompact: {
+    fontSize: 28,
+    lineHeight: 32
+  },
+  referenceSearchText: {
+    flex: 1,
+    minWidth: 0,
+    color: "#5D6673",
+    fontSize: 18,
+    lineHeight: 25,
+    fontWeight: "800"
+  },
+  referenceSearchTextCompact: {
+    fontSize: 16,
+    lineHeight: 22
+  },
+  referenceMapSearchPill: {
+    minHeight: 54,
+    borderRadius: 28,
+    marginTop: 30,
+    paddingHorizontal: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: "rgba(255,255,255,0.96)",
+    shadowColor: "#243447",
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 7
+  },
+  referenceMapSearchPillCompact: {
+    minHeight: 44,
+    borderRadius: 22,
+    marginTop: 14,
+    paddingHorizontal: 18,
+    gap: 8,
+    shadowOpacity: 0.11,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 }
+  },
+  referenceRefreshIcon: {
+    color: "#F59E0B",
+    fontSize: 23,
+    lineHeight: 26,
+    fontWeight: "900"
+  },
+  referenceRefreshIconCompact: {
+    fontSize: 19,
+    lineHeight: 22
+  },
+  referenceMapSearchText: {
+    color: "#D97706",
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: "900"
+  },
+  referenceMapSearchTextCompact: {
+    fontSize: 14,
+    lineHeight: 18
+  },
+  referenceLocateButton: {
+    position: "absolute",
+    left: 26,
+    bottom: 416,
+    zIndex: 7,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.97)",
+    shadowColor: "#243447",
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 9
+  },
+  referenceLocateIcon: {
+    color: "#F59E0B",
+    fontSize: 34,
+    lineHeight: 38,
+    fontWeight: "900"
+  },
+  referenceLocateIconCompact: {
+    fontSize: 28,
+    lineHeight: 32
+  },
+  referenceBottomSheet: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 94,
+    zIndex: 9,
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 14,
+    backgroundColor: "rgba(255,255,255,0.995)",
+    overflow: "hidden",
+    shadowColor: "#172033",
+    shadowOpacity: 0.14,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: -8 },
+    elevation: 10
+  },
+  referenceBottomSheetCompact: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 10
+  },
+  referenceSheetHandleHit: {
+    alignSelf: "center",
+    minWidth: 84,
+    minHeight: 24,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  referenceSheetHandle: {
+    alignSelf: "center",
+    width: 54,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: "#D1D5DB"
+  },
+  referenceSheetTopLine: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 2,
+    marginBottom: 8
+  },
+  referenceSheetTopLineCompact: {
+    minHeight: 36,
+    marginTop: 0,
+    marginBottom: 5
+  },
+  referenceSheetTitleWrap: {
+    flex: 1,
+    minWidth: 0
+  },
+  referenceSheetTitle: {
+    color: "#111827",
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: "900"
+  },
+  referenceSheetTitleCompact: {
+    fontSize: 16,
+    lineHeight: 20
+  },
+  referenceSheetSubtitle: {
+    color: "#8B93A1",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "800",
+    marginTop: 1
+  },
+  referenceSheetSubtitleCompact: {
+    fontSize: 10,
+    lineHeight: 13
+  },
+  referenceSavedShortcut: {
+    minWidth: 44,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF4CF"
+  },
+  referenceSavedShortcutCompact: {
+    minWidth: 40,
+    height: 30,
+    borderRadius: 15
+  },
+  referenceSavedShortcutText: {
+    color: "#111827",
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: "900"
+  },
+  referenceSheetSnapText: {
+    minWidth: 34,
+    color: "#9CA3AF",
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "900",
+    textAlign: "right"
+  },
+  referenceSegment: {
+    minHeight: 56,
+    borderRadius: 36,
+    padding: 5,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#E9E9EF"
+  },
+  referenceSegmentButton: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 46,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10
+  },
+  referenceSegmentButtonActive: {
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#1F2937",
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 4
+  },
+  referenceSegmentText: {
+    color: "#8F949E",
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  referenceSegmentTextActive: {
+    color: "#2F80FF"
+  },
+  referenceFilterScroll: {
+    marginHorizontal: -18,
+    marginTop: 8
+  },
+  referenceFilterScrollCompact: {
+    marginHorizontal: -16,
+    marginTop: 5
+  },
+  referenceCategoryChips: {
+    paddingHorizontal: 18,
+    gap: 8
+  },
+  referenceCategoryChipsCompact: {
+    paddingHorizontal: 16,
+    gap: 7
+  },
+  referenceCategoryChip: {
+    height: 38,
+    borderRadius: 19,
+    paddingHorizontal: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "#EEF0F3"
+  },
+  referenceCategoryChipActive: {
+    backgroundColor: "#FFC233",
+    borderColor: "#FFC233",
+    shadowColor: "#7C4A00",
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 4
+  },
+  referenceCategoryIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    textAlign: "center",
+    backgroundColor: "rgba(255,255,255,0.78)",
+    color: "#4B5563",
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: "900"
+  },
+  referenceCategoryIconActive: {
+    color: "#111827",
+    backgroundColor: "rgba(255,255,255,0.92)"
+  },
+  referenceCategoryText: {
+    color: "#3F4652",
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: "900"
+  },
+  referenceCategoryTextActive: {
+    color: "#111827"
+  },
+  referenceBadgeRow: {
+    minHeight: 30,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginTop: 8
+  },
+  referenceMangoBadge: {
+    overflow: "hidden",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    color: "#111827",
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "900",
+    backgroundColor: "#FFF4CF"
+  },
+  referenceRisingBadge: {
+    overflow: "hidden",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    color: "#2F5B16",
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "900",
+    backgroundColor: "#E8F8D7"
+  },
+  referenceMiniGhostButton: {
+    marginLeft: "auto",
+    minWidth: 44,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3F5F8"
+  },
+  referenceMiniGhostText: {
+    color: "#4B5563",
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "900"
+  },
+  referenceSituationScroll: {
+    marginHorizontal: -18,
+    marginTop: 7
+  },
+  referenceSituationChips: {
+    paddingHorizontal: 18,
+    gap: 7
+  },
+  referenceSituationChip: {
+    overflow: "hidden",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    color: "#4B5563",
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "900",
+    backgroundColor: "#F3F5F8",
+    borderWidth: 1,
+    borderColor: "#EEF0F3"
+  },
+  referenceSituationChipActive: {
+    color: "#111827",
+    backgroundColor: "#FFF4CF",
+    borderColor: "#FFE3A3"
+  },
+  referenceIconChip: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F2F3F7"
+  },
+  referenceIconChipText: {
+    color: "#5F6977",
+    fontSize: 22,
+    lineHeight: 24,
+    fontWeight: "900"
+  },
+  referenceFilterChip: {
+    height: 48,
+    borderRadius: 24,
+    paddingHorizontal: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#F2F3F7"
+  },
+  referenceFilterIcon: {
+    color: "#6B7280",
+    fontSize: 19,
+    lineHeight: 22,
+    fontWeight: "900"
+  },
+  referenceParkingIcon: {
+    color: "#6B7280",
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: "900"
+  },
+  referenceFilterText: {
+    color: "#3F4652",
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "900"
+  },
+  referenceResultBlock: {
+    flex: 1,
+    minHeight: 0,
+    paddingTop: 10
+  },
+  referenceResultBlockPeek: {
+    paddingTop: 4
+  },
+  referenceResultHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 13
+  },
+  referenceResultIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  referenceResultIconText: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    lineHeight: 26,
+    fontWeight: "900"
+  },
+  referenceResultCopyWrap: {
+    flex: 1,
+    minWidth: 0
+  },
+  referenceResultEyebrow: {
+    color: "#2F80FF",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900"
+  },
+  referenceResultTitle: {
+    color: "#111827",
+    fontSize: 23,
+    lineHeight: 29,
+    fontWeight: "900",
+    marginTop: 1
+  },
+  referenceResultCopy: {
+    color: "#6B7280",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "800",
+    marginTop: 2
+  },
+  referenceStatsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 15
+  },
+  referenceStatPill: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 55,
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    justifyContent: "center",
+    backgroundColor: "#F3F5F8"
+  },
+  referenceStatLabel: {
+    color: "#8B93A1",
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: "900"
+  },
+  referenceStatValue: {
+    color: "#111827",
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "900",
+    marginTop: 3
+  },
+  referenceActionRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10
+  },
+  referencePrimaryButton: {
+    flex: 1,
+    minHeight: 50,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#2F80FF"
+  },
+  referencePrimaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "900"
+  },
+  referenceSecondaryButton: {
+    width: 78,
+    minHeight: 50,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3F5F8"
+  },
+  referenceSecondaryButtonText: {
+    color: "#3F4652",
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "900"
+  },
+  referencePlaceList: {
+    flex: 1,
+    minHeight: 0,
+    marginHorizontal: -4,
+    marginTop: 12
+  },
+  referencePlaceListPeek: {
+    marginTop: 6
+  },
+  referencePlaceListContent: {
+    gap: 10,
+    paddingHorizontal: 4,
+    paddingBottom: 18
+  },
+  referencePlaceListContentPeek: {
+    gap: 6,
+    paddingBottom: 8
+  },
+  referencePlaceListContentMid: {
+    gap: 8
+  },
+  referencePlaceCard: {
+    minHeight: 112,
+    borderRadius: 22,
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#EEF0F3",
+    shadowColor: "#172033",
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3
+  },
+  referencePlaceCardPeek: {
+    minHeight: 82,
+    padding: 8,
+    borderRadius: 18,
+    alignItems: "center"
+  },
+  referencePlaceImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 18,
+    backgroundColor: "#F3F4F6"
+  },
+  referencePlaceImagePeek: {
+    width: 54,
+    height: 54,
+    borderRadius: 14
+  },
+  referencePlaceImageEmpty: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF4CF"
+  },
+  referencePlaceImageText: {
+    color: "#111827",
+    fontSize: 22,
+    lineHeight: 26,
+    fontWeight: "900"
+  },
+  referencePlaceBody: {
+    flex: 1,
+    minWidth: 0
+  },
+  referencePlaceBadges: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 4
+  },
+  referenceRankBadge: {
+    overflow: "hidden",
+    maxWidth: 112,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    color: "#111827",
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: "900",
+    backgroundColor: "#FFF4CF"
+  },
+  referenceHotBadge: {
+    overflow: "hidden",
+    maxWidth: 82,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    color: "#2F5B16",
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: "900",
+    backgroundColor: "#E8F8D7"
+  },
+  referencePlaceTitle: {
+    color: "#111827",
+    fontSize: 15,
+    lineHeight: 19,
+    fontWeight: "900"
+  },
+  referencePlaceMeta: {
+    color: "#5D6673",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "800",
+    marginTop: 3
+  },
+  referencePlaceReason: {
+    color: "#111827",
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "800",
+    marginTop: 3
+  },
+  referencePlaceCaution: {
+    color: "#9A5A00",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "800",
+    marginTop: 2
+  },
+  referencePlaceDistance: {
+    color: "#9CA3AF",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "800",
+    marginTop: 2
+  },
+  referenceSaveButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3F5F8"
+  },
+  referenceSaveButtonActive: {
+    backgroundColor: "#111827"
+  },
+  referenceSaveButtonText: {
+    color: "#6B7280",
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: "900"
+  },
+  referenceSaveButtonTextActive: {
+    color: "#FFC233"
+  },
+  referenceEmptyState: {
+    flex: 1,
+    minHeight: 160,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingBottom: 10
+  },
+  referenceEmptyIcon: {
+    color: "#9CA3AF",
+    fontSize: 56,
+    lineHeight: 60,
+    fontWeight: "800"
+  },
+  referenceEmptyText: {
+    color: "#6B7280",
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: "800",
+    marginTop: 14,
+    textAlign: "center"
+  },
+  legacyMapHidden: {
+    display: "none"
   },
   nightScanline: {
+    display: "none",
     position: "absolute",
     left: 0,
     right: 0,
@@ -1921,6 +4050,7 @@ const styles = StyleSheet.create({
     transform: [{ rotate: "-8deg" }]
   },
   neonSweep: {
+    display: "none",
     position: "absolute",
     left: 0,
     right: 0,
@@ -2002,6 +4132,53 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 24,
     lineHeight: 26,
+    fontWeight: "900"
+  },
+  mapIntroPanel: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    borderRadius: 28,
+    padding: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 14,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(255,194,51,0.35)",
+    ...shadow
+  },
+  mapIntroEyebrow: {
+    color: "#FF9F1C",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900"
+  },
+  mapIntroTitle: {
+    color: colors.ink,
+    fontSize: 21,
+    lineHeight: 27,
+    fontWeight: "900",
+    marginTop: 3
+  },
+  mapIntroCopy: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "800",
+    marginTop: 5
+  },
+  mapIntroButton: {
+    flexShrink: 0,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: "#FFD43B"
+  },
+  mapIntroButtonText: {
+    color: colors.ink,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: "900"
   },
   topSavedSection: {
@@ -2183,14 +4360,17 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.10)",
     marginVertical: 13
   },
+  cityRailScroll: {
+    zIndex: 6
+  },
   cityRail: {
     zIndex: 6,
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 8,
     backgroundColor: "#FFF4D8",
     borderRadius: 22,
-    padding: 5
+    padding: 5,
+    paddingRight: 13
   },
   cityChip: {
     minHeight: 38,
@@ -2221,8 +4401,8 @@ const styles = StyleSheet.create({
   categoryRail: {
     zIndex: 5,
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 8,
+    paddingRight: 20
   },
   categoryChip: {
     minHeight: 50,
@@ -2234,6 +4414,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 9
+  },
+  categoryChipActive: {
+    borderWidth: 2,
+    transform: [{ translateY: -1 }],
+    shadowColor: "#FFB000",
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 }
   },
   categoryEmoji: {
     width: 28,
@@ -2360,13 +4548,13 @@ const styles = StyleSheet.create({
   bottomSheet: {
     marginHorizontal: 20,
     marginTop: 12,
-    borderRadius: 28,
+    borderRadius: 20,
     paddingHorizontal: 22,
     paddingTop: 12,
     paddingBottom: 18,
-    backgroundColor: "rgba(255,255,255,0.94)",
+    backgroundColor: "rgba(255,255,255,0.96)",
     borderWidth: 1,
-    borderColor: "rgba(255,194,51,0.22)",
+    borderColor: colors.line,
     ...neonShadow
   },
   sheetHandle: {
@@ -2374,7 +4562,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 5,
     borderRadius: 999,
-    backgroundColor: "#EBD8A6",
+    backgroundColor: "#D9D1C2",
     opacity: 1,
     marginBottom: 15
   },
@@ -2385,28 +4573,28 @@ const styles = StyleSheet.create({
     gap: 12
   },
   sheetEyebrow: {
-    color: colors.cyan,
+    color: colors.greenDeep,
     fontSize: 12,
-    fontWeight: "900"
+    fontWeight: "800"
   },
   sheetTitle: {
     color: colors.ink,
-    fontSize: 30,
-    lineHeight: 36,
-    fontWeight: "900",
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: "800",
     marginTop: 2
   },
   sheetCopy: {
     color: colors.muted,
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: "800",
+    fontWeight: "600",
     marginTop: 4
   },
   sheetIcon: {
     width: 58,
     height: 58,
-    borderRadius: 20,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -2423,8 +4611,8 @@ const styles = StyleSheet.create({
   infoPill: {
     flex: 1,
     minHeight: 58,
-    borderRadius: 18,
-    backgroundColor: "#FFF4D8",
+    borderRadius: 14,
+    backgroundColor: "#F7F5EF",
     paddingHorizontal: 11,
     paddingVertical: 10,
     justifyContent: "center"
@@ -2432,13 +4620,13 @@ const styles = StyleSheet.create({
   infoLabel: {
     color: colors.muted,
     fontSize: 11,
-    fontWeight: "900"
+    fontWeight: "700"
   },
   infoValue: {
     color: colors.ink,
     fontSize: 14,
     lineHeight: 18,
-    fontWeight: "900",
+    fontWeight: "800",
     marginTop: 3
   },
   actionRow: {
@@ -2449,10 +4637,10 @@ const styles = StyleSheet.create({
   primaryAction: {
     flex: 1,
     minHeight: 56,
-    borderRadius: 20,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.sunset,
+    backgroundColor: colors.greenDeep,
     borderWidth: 1,
     borderColor: "rgba(255,216,189,0.34)",
     ...sunsetGlow
@@ -2464,37 +4652,37 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.97 }]
   },
   primaryActionText: {
-    color: "#FFF7F0",
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "900"
+    fontWeight: "800"
   },
   secondaryAction: {
     width: 92,
     minHeight: 56,
-    borderRadius: 20,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFF4D8",
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#F1D9A8"
+    borderColor: colors.line
   },
   secondaryActionText: {
     color: colors.ink,
     fontSize: 15,
-    fontWeight: "900"
+    fontWeight: "800"
   },
   todayPanel: {
     marginHorizontal: 20,
     marginBottom: 14,
-    borderRadius: 30,
+    borderRadius: 20,
     padding: 17,
-    backgroundColor: "#432600",
+    backgroundColor: colors.greenDeep,
     borderWidth: 1,
-    borderColor: "rgba(255,210,74,0.48)",
-    shadowColor: "#FF9F1C",
-    shadowOpacity: 0.22,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 }
+    borderColor: "rgba(255,255,255,0.12)",
+    shadowColor: "#203528",
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 }
   },
   todayHeader: {
     flexDirection: "row",
@@ -2507,23 +4695,23 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   todayEyebrow: {
-    color: "#FFD43B",
+    color: colors.cyan,
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: "900"
+    fontWeight: "800"
   },
   todayTitle: {
     color: "#FFF7DF",
     fontSize: 24,
     lineHeight: 31,
-    fontWeight: "900",
+    fontWeight: "800",
     marginTop: 5
   },
   todayCopy: {
-    color: "rgba(255,247,223,0.74)",
+    color: "rgba(255,255,255,0.72)",
     fontSize: 12,
     lineHeight: 18,
-    fontWeight: "800",
+    fontWeight: "600",
     marginTop: 5
   },
   todayReactionBadge: {
@@ -2532,7 +4720,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 9,
     alignItems: "center",
-    backgroundColor: "#FFC233"
+    backgroundColor: colors.cyan
   },
   todayReactionValue: {
     color: colors.ink,
@@ -2541,10 +4729,10 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   todayReactionLabel: {
-    color: "#5C3600",
+    color: colors.greenDeep,
     fontSize: 10,
     lineHeight: 13,
-    fontWeight: "900"
+    fontWeight: "800"
   },
   heroCtaRow: {
     flexDirection: "row",
@@ -2554,11 +4742,11 @@ const styles = StyleSheet.create({
   heroPrimaryCta: {
     flex: 1,
     minHeight: 54,
-    borderRadius: 20,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FF8A1F",
-    shadowColor: "#FF8A1F",
+    backgroundColor: colors.cyan,
+    shadowColor: colors.cyan,
     shadowOpacity: 0.30,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 9 }
@@ -2574,14 +4762,14 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,247,223,0.28)"
   },
   heroPrimaryText: {
-    color: "#271400",
+    color: colors.ink,
     fontSize: 15,
-    fontWeight: "900"
+    fontWeight: "800"
   },
   heroSecondaryText: {
     color: "#FFF7DF",
     fontSize: 15,
-    fontWeight: "900"
+    fontWeight: "800"
   },
   trustSignalGrid: {
     gap: 9,

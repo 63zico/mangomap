@@ -30,7 +30,7 @@ export function SavedTripsScreen({ trips, savedPlaces, onBack, onSelect, onToggl
       {savedPlaces.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>아직 찜한 장소가 없어요</Text>
-          <Text style={styles.emptyCopy}>핫플 탭에서 맛집, 카페, 숨은 장소를 찜해두면 여기에 모여요.</Text>
+          <Text style={styles.emptyCopy}>탐색 탭에서 맛집, 카페, 숨은 장소를 찜해두면 여기에 모여요.</Text>
           <PrimaryButton label="홈으로 가기" onPress={onBack} />
         </View>
       ) : null}

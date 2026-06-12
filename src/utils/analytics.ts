@@ -30,6 +30,6 @@ export function trackEvent(name: AnalyticsEventName, payload: AnalyticsPayload =
   window.gtag?.("event", name, payload);
 
   if (process.env.NODE_ENV !== "production") {
-    console.info("[MANGOMAP analytics]", name, payload);
+    console.info("[Mango Vietnam analytics]", name, payload);
   }
 }

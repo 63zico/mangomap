@@ -14,7 +14,7 @@ export function BrandLogo({ size = 132, framed = true }: BrandLogoProps) {
 
   return (
     <View
-      accessibilityLabel="MANGOMAP 로고"
+      accessibilityLabel="망고베트남 로고"
       style={[styles.wrap, framed && styles.framed, { width: size, height: size, borderRadius: radius }]}
     >
       <Image source={mangoMapLogo} resizeMode="contain" style={[styles.image, { borderRadius: radius }]} />
@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
   },
   framed: {
     borderWidth: 1,
-    borderColor: "rgba(183,121,0,0.14)",
+    borderColor: "rgba(24,32,42,0.08)",
     ...shadow
   },
   image: {

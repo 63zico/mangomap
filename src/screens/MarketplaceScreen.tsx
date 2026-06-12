@@ -2006,7 +2006,7 @@ export function MarketplaceScreen({
 
       {entryMode === "all" && displayItems.length === 0 ? (
         <View style={styles.marketEmptyCard}>
-          <Text style={styles.marketEmptyKicker}>MANGOMAP MARKET</Text>
+          <Text style={styles.marketEmptyKicker}>MANGO VIETNAM MARKET</Text>
           <Text style={styles.marketEmptyTitle}>
             {marketViewMode === "selling"
               ? "내 판매글이 아직 없어요"

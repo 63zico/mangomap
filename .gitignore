@@ -1,6 +1,8 @@
 node_modules/
 .expo/
+.next/
 .env
+tsconfig.tsbuildinfo
 dist/
 build/
 data/collected-google-places.json

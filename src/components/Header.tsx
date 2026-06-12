@@ -28,6 +28,8 @@ export function Header({ eyebrow, title, subtitle, compactMascot, dark }: Header
 
 const styles = StyleSheet.create({
   wrap: {
+    width: "100%",
+    minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -35,7 +37,8 @@ const styles = StyleSheet.create({
     marginBottom: 16
   },
   copy: {
-    flex: 1
+    flex: 1,
+    minWidth: 0
   },
   eyebrow: {
     color: colors.cyan,
@@ -47,13 +50,15 @@ const styles = StyleSheet.create({
     color: colors.nightText,
     fontSize: 29,
     lineHeight: 35,
-    fontWeight: "900"
+    fontWeight: "900",
+    flexShrink: 1
   },
   subtitle: {
     color: colors.nightMuted,
     fontSize: 15,
     lineHeight: 22,
-    marginTop: 7
+    marginTop: 7,
+    flexShrink: 1
   },
   eyebrowDark: {
     color: colors.cyan,
@@ -69,10 +74,12 @@ const styles = StyleSheet.create({
   },
   mascot: {
     width: 152,
-    alignItems: "center"
+    alignItems: "center",
+    flexShrink: 0
   },
   smallMascot: {
     width: 92,
-    alignItems: "center"
+    alignItems: "center",
+    flexShrink: 0
   }
 });

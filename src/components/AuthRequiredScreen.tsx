@@ -58,7 +58,7 @@ export function AuthRequiredScreen({ title, copy, onClose }: AuthRequiredScreenP
     setLoading(true);
     savePendingLegalConsent(createLegalConsent());
     openSupabaseOAuth(mode);
-    setStatus(`${selectedMethod.label} 화면으로 이동해요. 인증 후 MANGOMAP으로 돌아오면 가입이 완료돼요.`);
+    setStatus(`${selectedMethod.label} 화면으로 이동해요. 인증 후 망고베트남으로 돌아오면 가입이 완료돼요.`);
     setLoading(false);
   };
 

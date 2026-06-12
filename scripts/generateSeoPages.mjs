@@ -1,7 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const SITE_URL = "https://mangomap.vercel.app";
+const SITE_URL = process.env.SITE_URL || "https://mango-vietnam.com";
+const BRAND_NAME = "망고베트남";
+const BRAND_NAME_EN = "Mango Vietnam";
+const BRAND_TITLE_SUFFIX = "망고베트남";
+const MAP_CTA_NAME = "망고베트남 지도";
 const ROOT_DIR = process.cwd();
 const DIST_DIR = path.join(ROOT_DIR, "dist");
 const PLACES_FILE = path.join(ROOT_DIR, "src", "data", "places.ts");
@@ -148,7 +152,7 @@ const FINAL = [
 const CATEGORY_PAGES = [
   {
     slug: "ho-chi-minh-korean-restaurants",
-    title: "호치민 한식 맛집 추천 | 한국인이 보기 좋은 식당 지도 - MANGOMAP",
+    title: `호치민 한식 맛집 추천 | 한국인이 보기 좋은 식당 - ${BRAND_TITLE_SUFFIX}`,
     description:
       "호치민에서 한식이 필요할 때 보기 좋은 식당을 한국어 후기와 위치 정보 중심으로 정리했습니다.",
     h1: "호치민 한식 맛집 추천",
@@ -157,16 +161,16 @@ const CATEGORY_PAGES = [
   },
   {
     slug: "ho-chi-minh-restaurants",
-    title: "호치민 맛집 지도 | 한국인 추천 식당 정보 - MANGOMAP",
+    title: `호치민 맛집 가이드 | 한국인 추천 식당 정보 - ${BRAND_TITLE_SUFFIX}`,
     description:
-      "호치민 맛집을 주소, 영업시간, 가격대, 한국어 후기와 함께 확인하세요. MANGOMAP은 한국인 여행자를 위한 베트남 현지 장소 지도입니다.",
-    h1: "호치민 맛집 지도",
+      `${BRAND_NAME}에서 호치민 맛집을 주소, 영업시간, 가격대, 한국어 후기와 함께 확인하세요. 한국인이 베트남에서 식당 고르다 실패하지 않게 돕는 가이드입니다.`,
+    h1: "호치민 맛집 가이드",
     city: "호치민",
     matcher: (place) => getCityName(place) === "호치민" && place.category === "맛집",
   },
   {
     slug: "ho-chi-minh-massage",
-    title: "호치민 마사지 추천 | 한국인이 보기 좋은 마사지 정보 - MANGOMAP",
+    title: `호치민 마사지 추천 | 한국인이 보기 좋은 마사지 정보 - ${BRAND_TITLE_SUFFIX}`,
     description:
       "호치민 마사지 스팟을 위치, 영업시간, 전화번호, 한국어 후기 기준으로 확인하세요.",
     h1: "호치민 마사지 추천",
@@ -175,7 +179,7 @@ const CATEGORY_PAGES = [
   },
   {
     slug: "ho-chi-minh-cafes",
-    title: "호치민 카페 추천 | 사진, 작업, 휴식하기 좋은 카페 - MANGOMAP",
+    title: `호치민 카페 추천 | 사진, 작업, 휴식하기 좋은 카페 - ${BRAND_TITLE_SUFFIX}`,
     description:
       "호치민 카페를 한국인 여행자 관점에서 사진, 휴식, 작업, 접근성 기준으로 정리했습니다.",
     h1: "호치민 카페 추천",
@@ -463,7 +467,7 @@ function getIntroParagraphs(place) {
         : category === "카페"
           ? "잠깐 쉬거나 사진을 남길 장소를 찾는다면 분위기, 위치, 좌석 흐름을 같이 보는 편이 좋습니다."
           : "방문 목적과 이동 동선을 함께 확인하면 실패 확률을 줄일 수 있습니다.";
-  const third = `MANGOMAP에서는 ${place.name} ${city}, ${place.name} 사이공, ${place.name} ${getEnglishCityName(
+  const third = `${BRAND_NAME}에서는 ${place.name} ${city}, ${place.name} 사이공, ${place.name} ${getEnglishCityName(
     place,
   )} 정보를 한국인 여행자 관점으로 정리합니다. ${city} ${category}, 호치민 한국인 추천 맛집, 호치민 맛집 지도처럼 검색하는 분들도 참고할 수 있게 구성했습니다.`;
   const fourth = `${situation ? `${situation} 상황에 특히 참고하기 좋고, ` : ""}부족한 정보는 업데이트 예정으로 표시해 실제 확인된 내용과 구분했습니다.`;
@@ -607,7 +611,7 @@ function schemaForPlace(place, canonical, imageUrls) {
           "@type": "Review",
           author: {
             "@type": "Person",
-            name: stripText(review.nickname) || "MANGOMAP 사용자",
+            name: stripText(review.nickname) || `${BRAND_NAME} 사용자`,
           },
           reviewBody: stripText(review.content),
           reviewRating: {
@@ -632,7 +636,7 @@ function breadcrumbSchema(title, canonical) {
       {
         "@type": "ListItem",
         position: 1,
-        name: "MANGOMAP",
+        name: BRAND_NAME,
         item: SITE_URL,
       },
       {
@@ -648,17 +652,17 @@ function breadcrumbSchema(title, canonical) {
 function getPlaceTitle(place) {
   const city = getCityName(place);
   const category = getCategoryLabel(place);
-  if (category === "맛집") return `${place.name} ${city} | 한국인 추천 맛집 정보 - MANGOMAP`;
-  if (category === "카페") return `${place.name} ${city} | 한국인 추천 카페 정보 - MANGOMAP`;
-  if (category === "마사지") return `${place.name} ${city} | 마사지 위치와 후기 정보 - MANGOMAP`;
-  if (category === "바/루프탑") return `${place.name} ${city} | 루프탑·바 추천 정보 - MANGOMAP`;
-  return `${place.name} ${city} | 한국인 여행자 장소 정보 - MANGOMAP`;
+  if (category === "맛집") return `${place.name} ${city} | 한국인 추천 맛집 정보 - ${BRAND_TITLE_SUFFIX}`;
+  if (category === "카페") return `${place.name} ${city} | 한국인 추천 카페 정보 - ${BRAND_TITLE_SUFFIX}`;
+  if (category === "마사지") return `${place.name} ${city} | 마사지 위치와 후기 정보 - ${BRAND_TITLE_SUFFIX}`;
+  if (category === "바/루프탑") return `${place.name} ${city} | 루프탑·바 추천 정보 - ${BRAND_TITLE_SUFFIX}`;
+  return `${place.name} ${city} | 한국인 여행자 장소 정보 - ${BRAND_TITLE_SUFFIX}`;
 }
 
 function getPlaceDescription(place) {
   const city = getCityName(place);
   return truncate(
-    `${city}에서 ${place.name}을 찾는 분들을 위한 정보. 주소, 영업시간, 전화번호, 메뉴, 한국인 후기와 위치를 MANGOMAP에서 확인하세요.`,
+    `${city}에서 ${place.name}을 찾는 분들을 위한 정보. 주소, 영업시간, 전화번호, 메뉴, 한국인 후기와 위치를 ${BRAND_NAME}에서 확인하세요.`,
     155,
   );
 }
@@ -768,12 +772,12 @@ function renderPlacePage(place, slug) {
   const body = `
     <main class="place-page">
       <nav class="top-nav" aria-label="상단 이동">
-        <a href="${SITE_URL}">MANGOMAP</a>
+        <a href="${SITE_URL}">${BRAND_NAME}</a>
         <a href="${SITE_URL}/sitemap.xml">Sitemap</a>
       </nav>
 
       <header class="hero">
-        <p class="eyebrow">한국인이 베트남에서 믿고 볼 수 있는 현지 장소 지도</p>
+        <p class="eyebrow">한국인이 베트남에서 식당 고르다 실패하지 않게</p>
         <h1>${escapeHtml(place.name)} ${escapeHtml(city)}</h1>
         <p class="summary">${escapeHtml(getOneLine(place))}</p>
         <div class="hero-meta">
@@ -783,7 +787,7 @@ function renderPlacePage(place, slug) {
           <span>${escapeHtml(verifiedText)}</span>
         </div>
         <div class="hero-actions">
-          <a class="primary-cta" href="${escapeHtml(appUrl)}">MANGOMAP에서 위치 보기</a>
+          <a class="primary-cta" href="${escapeHtml(appUrl)}">${MAP_CTA_NAME}에서 위치 보기</a>
           <a class="ghost-cta" href="#reviews">한국인 후기 보기</a>
         </div>
       </header>
@@ -837,15 +841,15 @@ function renderPlacePage(place, slug) {
 
       <section class="keyword-copy">
         <h2>${escapeHtml(place.name)} 검색 정보</h2>
-        <p>${escapeHtml(place.name)} ${escapeHtml(city)} 정보를 찾고 있다면 MANGOMAP에서 주소와 영업시간, 한국어 후기를 함께 확인할 수 있습니다.</p>
+        <p>${escapeHtml(place.name)} ${escapeHtml(city)} 정보를 찾고 있다면 ${BRAND_NAME}에서 주소와 영업시간, 한국어 후기를 함께 확인할 수 있습니다.</p>
         <p>${escapeHtml(place.name)} 사이공, ${escapeHtml(place.name)} ${escapeHtml(cityEnglish)}, ${escapeHtml(
           city,
         )} ${escapeHtml(category)}를 검색하는 한국인 여행자에게 필요한 정보를 한 페이지에 모았습니다.</p>
-        <p>호치민 한국인 추천 맛집, 호치민 한식 맛집, 호치민 맛집 지도처럼 한국어로 장소를 찾는 분들도 MANGOMAP에서 실제 방문 판단에 필요한 정보를 확인할 수 있습니다.</p>
+        <p>호치민 한국인 추천 맛집, 호치민 한식 맛집, 호치민 맛집 가이드처럼 한국어로 장소를 찾는 분들도 ${BRAND_NAME}에서 실제 방문 판단에 필요한 정보를 확인할 수 있습니다.</p>
       </section>
 
       <section class="map-cta">
-        <h2>MANGOMAP에서 위치 보기</h2>
+        <h2>${MAP_CTA_NAME}에서 위치 보기</h2>
         <p>${escapeHtml(place.address || "위치 정보는 업데이트 예정입니다.")}</p>
         <a class="primary-cta" href="${escapeHtml(appUrl)}">지도에서 ${escapeHtml(place.name)} 열기</a>
       </section>
@@ -888,7 +892,7 @@ function renderCategoryPage(page, places) {
     canonical,
     schema,
     body: `<main class="place-page category-page">
-      <nav class="top-nav"><a href="${SITE_URL}">MANGOMAP</a></nav>
+      <nav class="top-nav"><a href="${SITE_URL}">${BRAND_NAME}</a></nav>
       <header class="hero">
         <p class="eyebrow">한국인 여행자 추천 리스트</p>
         <h1>${escapeHtml(page.h1)}</h1>
@@ -909,7 +913,7 @@ function renderLayout({ title, description, canonical, schema, body }) {
   <meta name="description" content="${escapeHtml(description)}" />
   <link rel="canonical" href="${escapeHtml(canonical)}" />
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="MANGOMAP" />
+  <meta property="og:site_name" content="${BRAND_NAME}" />
   <meta property="og:title" content="${escapeHtml(title)}" />
   <meta property="og:description" content="${escapeHtml(description)}" />
   <meta property="og:url" content="${escapeHtml(canonical)}" />
@@ -1318,13 +1322,19 @@ async function patchIndexHtml() {
     let html = await fs.readFile(indexPath, "utf8");
     html = html.replace(
       /<title>.*?<\/title>/i,
-      "<title>MANGOMAP | 한국인이 검증한 베트남 현지 장소 지도</title>",
+      `<title>${BRAND_NAME} | 한국인이 베트남에서 식당 고르다 실패하지 않게</title>`,
     );
-    if (!/<meta name="description"/i.test(html)) {
+    const rootDescription = `${BRAND_NAME}은 한국인이 베트남에서 식당 고르다 실패하지 않게 돕는 맛집, 카페, 마사지, 현지 장소 가이드입니다.`;
+    if (/<meta name="description"/i.test(html)) {
+      html = html.replace(
+        /<meta name="description" content=".*?"\s*\/?>/i,
+        `<meta name="description" content="${rootDescription}" />`,
+      );
+    } else {
       html = html.replace(
         /<head>/i,
         `<head>
-  <meta name="description" content="MANGOMAP은 한국인이 베트남에서 믿고 볼 수 있는 맛집, 카페, 마사지, 관광명소 지도입니다." />`,
+  <meta name="description" content="${rootDescription}" />`,
       );
     }
     if (!/<link rel="canonical"/i.test(html)) {

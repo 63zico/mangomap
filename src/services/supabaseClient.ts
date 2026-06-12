@@ -190,6 +190,13 @@ export async function supabaseUpsert<T>(table: string, row: unknown, conflictCol
   return rows[0];
 }
 
+export async function supabaseRpc<T>(functionName: string, body: Record<string, unknown>) {
+  return supabaseRest<T>(`/rest/v1/rpc/${functionName}`, {
+    method: "POST",
+    body
+  });
+}
+
 export async function supabasePatchById<T>(table: string, id: string, row: unknown) {
   const rows = await supabaseRest<T[]>(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
     method: "PATCH",

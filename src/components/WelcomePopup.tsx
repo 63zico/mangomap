@@ -37,15 +37,16 @@ export function WelcomePopup({ onExploreMap, onOpenPopularPlaces, onJoin, onClos
       measuredWidth
     ].filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0)
   );
-  const cardWidth = Platform.OS === "web" ? 324 : Math.min(Math.max(286, visibleWidth - 36), 336);
-  const cardLeft = Platform.OS === "web" ? 18 : Math.max(12, (visibleWidth - cardWidth) / 2);
+  const isWideWeb = Platform.OS === "web" && visibleWidth >= 760;
+  const cardWidth = isWideWeb ? 324 : Math.min(Math.max(286, visibleWidth - 28), 336);
+  const cardLeft = isWideWeb ? 18 : Math.max(12, (visibleWidth - cardWidth) / 2);
 
   return (
-    <View style={[styles.overlay, Platform.OS === "web" && styles.webOverlay]}>
+    <View style={[styles.overlay, Platform.OS === "web" && styles.webOverlay, !isWideWeb && styles.mobileOverlay]}>
       <View style={[styles.card, { width: cardWidth, marginLeft: cardLeft }]}>
         <View style={styles.topRow}>
           <View style={styles.logoWrap}>
-            <BrandLogo size={70} />
+            <BrandLogo size={58} />
           </View>
           <Pressable accessibilityRole="button" onPress={onClose} style={styles.closeButton}>
             <Text style={styles.closeText}>닫기</Text>
@@ -53,9 +54,9 @@ export function WelcomePopup({ onExploreMap, onOpenPopularPlaces, onJoin, onClos
         </View>
 
         <Text style={styles.eyebrow}>처음 오셨나요</Text>
-        <Text style={styles.title}>MANGOMAP은 한국인이 검증한 베트남 현지맵이에요</Text>
+        <Text style={styles.title}>망고베트남은 한국인이 베트남에서 실패하지 않게 돕는 가이드예요</Text>
         <Text style={styles.copy}>
-          Google Maps의 넓은 정보에 한국어 후기와 제보 맥락을 더해, 여행자가 더 빨리 결정하게 도와줘요.
+          넓은 지도 정보보다 한국어 후기, 제보, 최근 확인 맥락을 먼저 보여줘 여행자가 더 빨리 결정하게 도와줘요.
         </Text>
 
         <View style={styles.featureList}>
@@ -101,6 +102,10 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     backgroundColor: "rgba(31,41,55,0.42)"
   },
+  mobileOverlay: {
+    justifyContent: "flex-end",
+    paddingBottom: 104
+  },
   webOverlay: {
     position: "fixed" as never
   },
@@ -108,7 +113,7 @@ const styles = StyleSheet.create({
     width: "86%",
     maxWidth: 420,
     borderRadius: 30,
-    padding: 18,
+    padding: 15,
     backgroundColor: "rgba(255,247,223,0.98)",
     borderWidth: 1,
     borderColor: "rgba(255,159,28,0.34)",
@@ -121,9 +126,9 @@ const styles = StyleSheet.create({
     gap: 12
   },
   logoWrap: {
-    width: 82,
-    height: 82,
-    borderRadius: 25,
+    width: 68,
+    height: 68,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#FFFFFF",
@@ -148,7 +153,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     alignSelf: "flex-start",
-    marginTop: 16,
+    marginTop: 12,
     borderRadius: 999,
     overflow: "hidden",
     paddingHorizontal: 11,
@@ -159,32 +164,32 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   title: {
-    marginTop: 12,
+    marginTop: 9,
     color: colors.ink,
-    fontSize: 24,
-    lineHeight: 31,
+    fontSize: 21,
+    lineHeight: 27,
     fontWeight: "900",
     flexShrink: 1
   },
   copy: {
     marginTop: 8,
     color: colors.muted,
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 13,
+    lineHeight: 19,
     fontWeight: "800",
     flexShrink: 1
   },
   featureList: {
-    gap: 9,
-    marginTop: 16
+    gap: 7,
+    marginTop: 12
   },
   featureCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 11,
-    minHeight: 72,
-    borderRadius: 22,
-    padding: 12,
+    gap: 9,
+    minHeight: 58,
+    borderRadius: 19,
+    padding: 9,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "rgba(235,216,166,0.95)",
@@ -215,16 +220,16 @@ const styles = StyleSheet.create({
   featureText: {
     marginTop: 3,
     color: colors.muted,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 11,
+    lineHeight: 15,
     fontWeight: "800"
   },
   actions: {
-    gap: 9,
-    marginTop: 16
+    gap: 7,
+    marginTop: 12
   },
   primaryButton: {
-    minHeight: 52,
+    minHeight: 47,
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
@@ -237,7 +242,7 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   secondaryButton: {
-    minHeight: 48,
+    minHeight: 43,
     borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
@@ -251,7 +256,7 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   joinButton: {
-    minHeight: 48,
+    minHeight: 43,
     borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",

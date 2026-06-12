@@ -15,10 +15,7 @@ export function getMangoCommentCount(place: CuratedPlace) {
 }
 
 export function getMangoReviewCount(place: CuratedPlace) {
-  const referenceReviewCount = place.reviews?.length ?? 0;
-  const koreanSignalCount = place.koreanReviewSignal?.reviewCount ?? 0;
-
-  return Math.max(referenceReviewCount, koreanSignalCount);
+  return place.reviews?.length ?? 0;
 }
 
 export function formatMangoRecommendationChip(place: CuratedPlace) {
@@ -26,7 +23,7 @@ export function formatMangoRecommendationChip(place: CuratedPlace) {
 }
 
 export function formatMangoCommentChip(place: CuratedPlace) {
-  return `댓글 ${getMangoCommentCount(place)}`;
+  return `후기 ${getMangoCommentCount(place)}`;
 }
 
 function getStableCommunityNumber(value: string, modulo: number) {

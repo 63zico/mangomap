@@ -3,9 +3,9 @@ export const legalConfig = {
   privacyVersion: "2026-05-27",
   pendingConsentStorageKey: "mangomap-pending-legal-consent-v1",
   supportEmail: "support@mangomap.app",
-  termsTitle: "MANGOMAP 이용약관",
+  termsTitle: "망고베트남 이용약관",
   privacyTitle: "개인정보 처리방침",
-  shortConsentText: "MANGOMAP 이용약관, 개인정보 처리방침, 커뮤니티 안전 수칙에 동의합니다.",
+  shortConsentText: "망고베트남 이용약관, 개인정보 처리방침, 커뮤니티 안전 수칙에 동의합니다.",
   communitySafetyText: "모임, 채팅, 중고거래에서는 신고/차단/삭제 정책이 적용되며 위험 거래와 불법 콘텐츠는 제한됩니다."
 };
 

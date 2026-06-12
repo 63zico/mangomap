@@ -499,7 +499,7 @@ function fromSupabaseMeetupRow(row: SupabaseMeetupRow): LocalMeetup {
     time: formatSupabaseMeetupDate(row.meetup_date, row.meetup_time),
     scheduledAt: parseSupabaseMeetupDate(row.meetup_date, row.meetup_time, row.created_at),
     category,
-    host: row.host_name || "MANGOMAP 호스트",
+    host: row.host_name || "망고베트남 호스트",
     hostAuthUid: row.host_auth_uid,
     seats: row.seats_label || "모집중",
     safety: row.safety || "공개 장소에서 만나요",
@@ -678,7 +678,7 @@ async function sendRemoteMeetupChatMessage(eventId: string, message: MeetupChatM
     return supabaseInsert<SupabaseMeetupMessageRow>("meetup_messages", {
       meetup_id: eventId,
       auth_uid: message.authorId || "member",
-      nickname: message.authorName || "MANGOMAP",
+      nickname: message.authorName || "망고베트남",
       message: message.text
     });
     return;
